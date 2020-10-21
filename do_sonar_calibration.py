@@ -29,7 +29,7 @@ from pathlib import Path
 # Location of files
 
 # The netCDF files:
-watchDir = Path(r'C:\Users\gavin\Data - not synced\example_data')
+watchDir = Path(r'C:\Users\gavin\Data - not synced\example_data\Furuno FCV30')
 # The log file that this program generates
 logDir = Path(r'C:\Users\gavin\Dropbox\IMR\sonarCal\log')
 #############################################################
@@ -51,8 +51,6 @@ import tkinter as tk
 from time import sleep
 import h5py
 import copy
-from datetime import datetime
-
 
 if sys.platform == "win32":
     import win32api
@@ -78,12 +76,7 @@ def main():
     canvas = FigureCanvasTkAgg(echogram.fig, master=root)
     canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
     
-    # a label to show the WBAT status
-    statusLabel = tk.Label(root)
-    statusLabel.pack(side='top', anchor=tk.W)
-    statusLabel.config(text='', anchor=tk.W)
-    
-    # and a label to show the last received message
+    # and a label to show the last received message time
     label = tk.Label(root)
     label.pack(side='left')
     label.config(text='Waiting for data...', width=100, anchor=tk.W)
@@ -101,7 +94,7 @@ def main():
 
     # Check periodically for new echogram data
     global job
-    job = root.after(echogram.checkQueueInterval, echogram.newPing, root, label, statusLabel)
+    job = root.after(echogram.checkQueueInterval, echogram.newPing, root, label)
     
     # And start things...
     root.protocol("WM_DELETE_WINDOW", window_closed)
@@ -141,7 +134,6 @@ def file_listen(watchDir):
         
         x = f['Sonar/Beam_group1/beam_direction_x'][-1]
         y = f['Sonar/Beam_group1/beam_direction_y'][-1]
-        z = f['Sonar/Beam_group1/beam_direction_z'][-1]
         
         # convert x,y,z direction into a horizontal angle for use elsewhere
         theta = np.arctan2(y, x)
@@ -151,7 +143,7 @@ def file_listen(watchDir):
         
         t_previous = t
         # send the data off to be plotted
-        queue.put((t,samInt,c,dr))
+        queue.put((t,samInt,c,dr,theta))
         sleep(1.0)
     #f.close()
 
@@ -198,16 +190,32 @@ class echogramPlotter:
     "Receive via a queue new ping data and use that to update the display"
     
     def __init__(self, numPings, maxRange, maxSv, minSv):
-        # Basic echogram display parameters
-        
+        # Various user-changable lines on the plots that could in the future 
+        # come from a config file.
+        self.beam = 25;
+        self.minTargetRange = 20;
+        self.maxTargetRange = 30;
+
         self.numPings = numPings # to show in the echograms
         self.maxRange = maxRange # [m] of the echograms
         self.maxSv = maxSv # [dB] max Sv to show in the echograms
         self.minSv = minSv # [dB] min Sv to show in the echograms
-        self.maxSamples = int(np.ceil(self.maxRange / (0.0005*1500/2))) # number of samples to store per ping
-        self.numBeams = 128 # Furuno 
         
         self.checkQueueInterval = 200 # [ms] duration between checking the queue for new data
+
+        # Make the plots. It gets filled with pretty things once the first ping 
+        # of data is received.
+        self.fig = plt.figure(figsize=(10,5))
+        plt.ion()
+        self.fig.tight_layout()
+        
+        self.firstPing = True
+        
+    def createGUI(self, samInt, c, backscatter, theta):
+        # Basic echogram display parameters
+        
+        self.maxSamples = int(np.ceil(self.maxRange / (samInt*c/2.0))) # number of samples to store per ping
+        self.numBeams = backscatter.shape[0]
         
         # Storage for the things we plot
         # Polar plot
@@ -221,22 +229,12 @@ class echogramPlotter:
         # Differences in sphere amplitudes
         self.ampDiffPort = np.ones((self.numPings), dtype=float) * np.nan
         self.ampDiffStbd = np.ones((self.numPings), dtype=float) * np.nan
-                
-        # Various user-changable lines on the plots
-        self.beam = 25;
-        self.minTargetRange = 20;
-        self.maxTargetRange = 30;
-        
-        # Make the plots
-        self.fig = plt.figure(figsize=(10,5))
-        plt.ion()
-        self.fig.tight_layout()
-        
+                        
         # Make the plot and set up static things
         self.polarPlotAx        = plt.subplot2grid((3,3), (0,0), rowspan=3, projection='polar')
-        self.portEchogramAx = plt.subplot2grid((3,3), (0,1))
-        self.mainEchogramAx = plt.subplot2grid((3,3), (1,1))
-        self.stbdEchogramAx = plt.subplot2grid((3,3), (2,1))
+        self.portEchogramAx     = plt.subplot2grid((3,3), (0,1))
+        self.mainEchogramAx     = plt.subplot2grid((3,3), (1,1))
+        self.stbdEchogramAx     = plt.subplot2grid((3,3), (2,1))
         self.ampPlotAx          = plt.subplot2grid((3,3), (0,2), rowspan=2)
         self.ampDiffPlotAx      = plt.subplot2grid((3,3), (2,2))
         
@@ -286,18 +284,13 @@ class echogramPlotter:
         self.polarPlotAx.set_theta_offset(np.pi/2)
         self.polarPlotAx.set_theta_direction(-1)
 
-        r = np.arange(0,self.maxSamples)*0.0005*1500/2
-        angleStep = 360.0/128.0
-        theta = np.linspace(-180,180-angleStep, num=self.numBeams) * np.pi/180.0
+        r = np.arange(0,self.maxSamples)*samInt*c/2.0
         self.polarPlot = self.polarPlotAx.pcolormesh(theta, r, self.polar, 
                             shading='auto', vmin=self.minSv, vmax=self.maxSv)
         
         # range rings on the polar plot
         #self.minRangeRing = draggable_ring(self.polarPlotAx, self.minTargetRange)
         #self.maxRangeRing = draggable_ring(self.polarPlotAx, self.maxTargetRange)
-        # beam line on the polar plot
-        # convert beam number to angle
-        beamLineAngle = 25
         #self.beamLine = draggable_radial(self.polarPlotAx, beamLineAngle, self.maxRange)
   
         # Plot labels
@@ -315,13 +308,14 @@ class echogramPlotter:
         self.ampDiffPlotAx.set_xlabel('Pings')
         self.ampPlotAx.set_ylabel('TS (dB)')
         self.ampDiffPlotAx.set_ylabel(r'$\Delta$ (dB)')
+        self.ampPlotAx.set_title('Maximum amplitude at 0 m')
 
         # Colourbar for the echogram
         #cbar = self.polarPlotplt.colorbar()
         #cbar.ax.set_ylabel('Sv [dB re 1 m$^{-1}$]')
         
     
-    def newPing(self, root, label, statusLabel):
+    def newPing(self, root, label):
         "Receives messages from the queue, decodes them and updates the echogram"
 
         while not queue.empty():
@@ -333,23 +327,29 @@ class echogramPlotter:
             else:
                 #try:
                     (t, samInt, c, backscatter, theta) = message
+                    
+                    if self.firstPing:
+                        self.firstPing = False
+                        self.createGUI(samInt, c, backscatter, theta)
+                    
                     # Update the plots with the data in the new ping
                     pingTime = datetime(1601,1,1) + timedelta(microseconds=t/1000.0)
                     timeBehind = datetime.now() - pingTime
                     label.config(text='Ping at {}, ({:.1f} seconds ago)'.format(pingTime, timeBehind.total_seconds()))
-                    
-                    numBeams = backscatter.shape[0]
+                
 
                     minSample = np.int(np.floor(2*self.minTargetRange / (samInt * c)))
                     maxSample = np.int(np.floor(2*self.maxTargetRange / (samInt * c)))
                     
+                    #self.beam = beamLineAngle + theta
+                    
                     # work out the beam indices
                     if self.beam == 0:
-                        beamPort = numBeams-1
+                        beamPort = self.numBeams-1
                     else:
                         beamPort = self.beam+1
                         
-                    if self.beam == numBeams-1:
+                    if self.beam == self.numBeams-1:
                         beamStbd = 0
                     else:
                         beamStbd = self.beam-1
@@ -358,7 +358,9 @@ class echogramPlotter:
                     # and store for plotting
                     self.amp = np.roll(self.amp, -1, 1)
                     self.amp[0, -1] = np.max(backscatter[beamPort][minSample:maxSample])
-                    self.amp[1, -1] = np.max(backscatter[self.beam][minSample:maxSample])
+                    max_i = np.argmax(backscatter[self.beam][minSample:maxSample])
+                    self.amp[1, -1] = backscatter[self.beam][minSample+max_i]
+                    rangeMax = (minSample+max_i) * samInt * c / 2.0
                     self.amp[2, -1] = np.max(backscatter[beamStbd][minSample:maxSample])
                     
                     # Store the amplitude for the 3 beams for the echograms
@@ -371,6 +373,7 @@ class echogramPlotter:
                     self.ampPlotLinePort.set_ydata(self.amp[0,:])
                     self.ampPlotLineMain.set_ydata(self.amp[1,:])
                     self.ampPlotLineStbd.set_ydata(self.amp[2,:])
+                    self.ampPlotAx.set_title('Maximum amplitude at {:.1f} m'.format(rangeMax))
                     self.ampPlotAx.relim()
                     self.ampPlotAx.autoscale_view()
                     
@@ -404,7 +407,7 @@ class echogramPlotter:
                 #     logging.warning(e)  
                 #     pass
         global job
-        job = root.after(self.checkQueueInterval, self.newPing, root, label, statusLabel)
+        job = root.after(self.checkQueueInterval, self.newPing, root, label)
             
     def updateEchogramData(self, data, pingData):
         data = np.roll(data, -1, 1)
