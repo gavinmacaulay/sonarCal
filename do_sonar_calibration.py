@@ -17,7 +17,7 @@ sonars
 
 #############################################################
 # Configure the echogram here. 
-numPings = 300 # to show in the echograms and sphere plots
+numPings = 100 # to show in the echograms and sphere plots
 maxRange = 100 # [m] of the echograms and polar plot
 maxSv = 6 # [dB] max Sv to show in the echogram
 minSv = 0 # [dB] min Sv to show in the echogram
@@ -41,6 +41,8 @@ mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.lines as lines
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from scipy import signal
+import tkinter.font as tkFont
 
 import threading
 import numpy as np
@@ -77,7 +79,8 @@ def main():
     canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
     
     # and a label to show the last received message time
-    label = tk.Label(root)
+    fontStyle = tkFont.Font(size=16)
+    label = tk.Label(root, font=fontStyle)
     label.pack(side='left')
     label.config(text='Waiting for data...', width=100, anchor=tk.W)
     
@@ -176,6 +179,7 @@ def file_replay(watchDir):
         
         # convert x,y,z direction into a horizontal angle for use elsewhere
         theta = np.arctan2(y, x)
+        theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
                 
         samInt = f['Sonar/Beam_group1/sample_interval'][i]
         c = f['Environment/sound_speed_indicative'][()]
@@ -203,6 +207,8 @@ class echogramPlotter:
         
         self.checkQueueInterval = 200 # [ms] duration between checking the queue for new data
 
+        self.movingAveragePoints = 10 # number of points to use in moving average for smoothed plots
+        
         # Make the plots. It gets filled with pretty things once the first ping 
         # of data is received.
         self.fig = plt.figure(figsize=(10,5))
@@ -226,9 +232,12 @@ class echogramPlotter:
         self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * -1.
         # Amplitude of sphere
         self.amp = np.ones((3, self.numPings), dtype=float) * np.nan
-        # Differences in sphere amplitudes
+        self.ampSmooth = np.ones((3, self.numPings), dtype=float) * np.nan
+        # Differences in sphere amplitudes, smoothed version
         self.ampDiffPort = np.ones((self.numPings), dtype=float) * np.nan
         self.ampDiffStbd = np.ones((self.numPings), dtype=float) * np.nan
+        self.ampDiffPortSmooth = np.ones((self.numPings), dtype=float) * np.nan
+        self.ampDiffStbdSmooth = np.ones((self.numPings), dtype=float) * np.nan
                         
         # Make the plot and set up static things
         self.polarPlotAx        = plt.subplot2grid((3,3), (0,0), rowspan=3, projection='polar')
@@ -261,13 +270,22 @@ class echogramPlotter:
         
         # Create the things in the plots
         # Sphere TS from 3 beams
-        self.ampPlotLinePort, = self.ampPlotAx.plot(self.amp[0,:], 'r-')
-        self.ampPlotLineMain, = self.ampPlotAx.plot(self.amp[1,:], 'k-')
-        self.ampPlotLineStbd, = self.ampPlotAx.plot(self.amp[2,:], 'g-')
+        self.ampPlotLinePort, = self.ampPlotAx.plot(self.amp[0,:], 'r-', linewidth=1)
+        self.ampPlotLineMain, = self.ampPlotAx.plot(self.amp[1,:], 'k-', linewidth=1)
+        self.ampPlotLineStbd, = self.ampPlotAx.plot(self.amp[2,:], 'g-', linewidth=1)
+        # Smoothed curves for the TS from 3 beams
+        self.ampPlotLinePortSmooth, = self.ampPlotAx.plot(self.ampSmooth[0,:], 'r-', linewidth=2)
+        self.ampPlotLineMainSmooth, = self.ampPlotAx.plot(self.ampSmooth[1,:], 'k-', linewidth=2)
+        self.ampPlotLineStbdSmooth, = self.ampPlotAx.plot(self.ampSmooth[2,:], 'g-', linewidth=2)
+        self.ampPlotAx.set_xlim(0, self.numPings)
         
         # Difference in sphere TS from the 3 beams
-        self.ampDiffPortPlot, = self.ampDiffPlotAx.plot(self.ampDiffPort, 'r-')
-        self.ampDiffStbdPlot, = self.ampDiffPlotAx.plot(self.ampDiffStbd, 'g-')
+        self.ampDiffPortPlot, = self.ampDiffPlotAx.plot(self.ampDiffPort, 'r-', linewidth=1)
+        self.ampDiffStbdPlot, = self.ampDiffPlotAx.plot(self.ampDiffStbd, 'g-', linewidth=1)
+        # Smoothed curves of the difference in TS
+        self.ampDiffPortPlotSmooth, = self.ampDiffPlotAx.plot(self.ampDiffPortSmooth, 'r-', linewidth=2)
+        self.ampDiffStbdPlotSmooth, = self.ampDiffPlotAx.plot(self.ampDiffStbdSmooth, 'g-', linewidth=2)
+        self.ampDiffPlotAx.set_xlim(0, self.numPings) 
         
         # Echogram for 3 beams
         ee = [0.0, self.numPings, self.maxRange, 0.0]
@@ -373,13 +391,31 @@ class echogramPlotter:
                     self.ampPlotLinePort.set_ydata(self.amp[0,:])
                     self.ampPlotLineMain.set_ydata(self.amp[1,:])
                     self.ampPlotLineStbd.set_ydata(self.amp[2,:])
+                    # and smoothed plots
+                    coeff = np.ones(self.movingAveragePoints)/self.movingAveragePoints
+                    
+                    self.ampSmooth[0,:] = signal.filtfilt(coeff, 1, self.amp[0,:])
+                    self.ampSmooth[1,:] = signal.filtfilt(coeff, 1, self.amp[1,:])
+                    self.ampSmooth[2,:] = signal.filtfilt(coeff, 1, self.amp[2,:])
+                    self.ampPlotLinePortSmooth.set_ydata(self.ampSmooth[0,:])
+                    self.ampPlotLineMainSmooth.set_ydata(self.ampSmooth[1,:])
+                    self.ampPlotLineStbdSmooth.set_ydata(self.ampSmooth[2,:])
+
                     self.ampPlotAx.set_title('Maximum amplitude at {:.1f} m'.format(rangeMax))
                     self.ampPlotAx.relim()
                     self.ampPlotAx.autoscale_view()
                     
                     # Difference in sphere TS from 3 beams
-                    self.ampDiffPortPlot.set_ydata(self.amp[1,:] - self.amp[0,:])
-                    self.ampDiffStbdPlot.set_ydata(self.amp[2,:] - self.amp[0,:])
+                    diffPort = self.amp[1,:] - self.amp[0,:]
+                    diffStbd = self.amp[2,:] - self.amp[0,:]
+                    self.ampDiffPortPlot.set_ydata(diffPort)
+                    self.ampDiffStbdPlot.set_ydata(diffStbd)
+                    # and the smoothed
+                    smPort = signal.filtfilt(coeff, 1, diffPort)
+                    smStbd = signal.filtfilt(coeff, 1, diffStbd)
+                    self.ampDiffPortPlotSmooth.set_ydata(smPort)
+                    self.ampDiffStbdPlotSmooth.set_ydata(smStbd)
+
                     self.ampDiffPlotAx.relim()
                     self.ampDiffPlotAx.autoscale_view()
                     
@@ -388,8 +424,9 @@ class echogramPlotter:
                     self.mainEchogram.set_data(self.main)
                     self.stbdEchogram.set_data(self.stbd)
                     
+                    self.portEchogramAx.set_title('Beam {} (port)'.format(beamPort), loc='left')
                     self.mainEchogramAx.set_title('Beam {}'.format(self.beam), loc='left')
-      
+                    self.stbdEchogramAx.set_title('Beam {} (starboard)'.format(beamStbd), loc='left')
                     
                     # Polar plot
                     for i, b in enumerate(backscatter):
