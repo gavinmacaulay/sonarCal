@@ -6,7 +6,6 @@ sonars.
 @author: gavinj
 """
 # TODO
-# Add grid to polar plot.
 # Implement Furuno equations to give Sv for display.
 # Implement reader to find new .nc files when current one stops being updated.
 # Provide an option to choose replay entire last file (good for testing) and 
@@ -14,14 +13,14 @@ sonars.
 # Choose beam_group based on beam type rather than assuming the type.
 # Make echogram range changable from the UI.
 # Re-enable try/catch in newPing function.
-# Add a colorbar to the omni display
+# Test and make work on Simrad netcdf files
 
 #############################################################
 # Configure the echogram here. 
 numPings = 100 # to show in the echograms and sphere plots
-maxRange = 100 # [m] of the echograms and polar plot
-maxSv = 6 # [dB] max Sv to show in the echogram
-minSv = 0 # [dB] min Sv to show in the echogram
+maxRange = 50 # [m] of the echograms and polar plot
+maxSv = 7 # [dB] max Sv to show in the echogram
+minSv = 2 # [dB] min Sv to show in the echogram
 #############################################################
 
 from pathlib import Path
@@ -224,6 +223,11 @@ class echogramPlotter:
     def createGUI(self, samInt, c, backscatter, theta):
         # Basic echogram display parameters
         
+        # The colormap for the echograms and omni plot
+        cmap = copy.copy(mpl.cm.jet) # viridis looks nice too...
+        c#map.set_over('w') # values above self.maxSv show in white, if desired
+        cmap.set_under('w') # and for values below self.minSv, if desired
+        
         self.maxSamples = int(np.ceil(self.maxRange / (samInt*c/2.0))) # number of samples to store per ping
         self.numBeams = backscatter.shape[0]
         
@@ -251,6 +255,8 @@ class echogramPlotter:
         self.ampPlotAx          = plt.subplot2grid((3,3), (0,2), rowspan=2)
         self.ampDiffPlotAx      = plt.subplot2grid((3,3), (2,2))
         
+        plt.tight_layout(pad=2, w_pad=0.05, h_pad=0.05) 
+        
         self.portEchogramAx.invert_yaxis()
         self.mainEchogramAx.invert_yaxis()
         self.stbdEchogramAx.invert_yaxis()
@@ -265,9 +271,11 @@ class echogramPlotter:
         self.ampPlotAx.yaxis.tick_right()
         self.ampPlotAx.yaxis.set_label_position("right")
         self.ampPlotAx.xaxis.set_ticklabels([])
+        self.ampPlotAx.grid(axis='y', linestyle=':')
         self.ampDiffPlotAx.yaxis.tick_right()
         self.ampDiffPlotAx.yaxis.set_label_position("right")
-        
+        self.ampDiffPlotAx.grid(axis='y', linestyle=':')
+                
         self.portEchogramAx.set_title('Port', loc='left')
         self.mainEchogramAx.set_title('Beam {}'.format(self.beam), loc='left')
         self.stbdEchogramAx.set_title('Starboard', loc='left')
@@ -297,18 +305,25 @@ class echogramPlotter:
         self.mainEchogram = self.mainEchogramAx.imshow(self.main, aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
         self.stbdEchogram = self.stbdEchogramAx.imshow(self.stbd, aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
         
-        # choose the colormap
-        cmap = copy.copy(mpl.cm.viridis)
-        cmap.set_under('w') # values below minSv show in white
-        #self.polarPlot.set_cmap(cmap)
+        self.portEchogram.set_cmap(cmap)
+        self.mainEchogram.set_cmap(cmap)
+        self.stbdEchogram.set_cmap(cmap)
         
         # Polar plot
         self.polarPlotAx.set_theta_offset(np.pi/2)
         self.polarPlotAx.set_theta_direction(-1)
+        self.polarPlotAx.set_frame_on(False)
 
         r = np.arange(0,self.maxSamples)*samInt*c/2.0
         self.polarPlot = self.polarPlotAx.pcolormesh(theta, r, self.polar, 
                             shading='auto', vmin=self.minSv, vmax=self.maxSv)
+        self.polarPlotAx.grid(axis='y', linestyle=':')
+
+        self.polarPlot.set_cmap(cmap)
+
+        cb = plt.colorbar(self.polarPlot, ax=self.polarPlotAx, orientation='horizontal',
+                          extend='both', fraction=0.05)
+        cb.set_label('Sv (dB re 1 $m^{-1}$)')
         
         # range rings on the polar plot
         self.rangeRing1 = draggable_ring(self.polarPlotAx, self.minTargetRange)
