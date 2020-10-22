@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Provides an echogram display for use when calibration omni-directional
-sonars
+Provides an echogram display for use when calibrating omni-directional
+sonars.
 
 @author: gavinj
 """
 # TODO
-# Make draggable lines on polar plot work
-# Add grid to polar plot
-# Do conversion between beam number and beam angle
-# Implement Furuno equations to give Sv for display
-# Implement reader to find new .nc files when current one stops being updated
-# Don't create plots until the first set of data is received to avoid the hard 
-#  currently done in __int__
-# choose beam_group based on beam type rather than assuming the type
+# Add grid to polar plot.
+# Implement Furuno equations to give Sv for display.
+# Implement reader to find new .nc files when current one stops being updated.
+# Provide an option to choose replay entire last file (good for testing) and 
+#  show the most recent ping from the last file, updating as new pings are added.
+# Choose beam_group based on beam type rather than assuming the type.
+# Make echogram range changable from the UI.
+# Re-enable try/catch in newPing function.
+# Add a colorbar to the omni display
 
 #############################################################
 # Configure the echogram here. 
