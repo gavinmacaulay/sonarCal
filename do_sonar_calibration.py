@@ -312,7 +312,7 @@ class echogramPlotter:
         # range rings on the polar plot
         self.rangeRing1 = draggable_ring(self.polarPlotAx, self.minTargetRange)
         self.rangeRing2 = draggable_ring(self.polarPlotAx, self.maxTargetRange)
-        self.beamLine = draggable_radial(self.polarPlotAx, self.beamLineAngle, self.maxRange)
+        self.beamLine = draggable_radial(self.polarPlotAx, self.beamLineAngle, self.maxRange, theta)
         
         self.updateBeamNum(theta) # sets self.beam from the positon of the radial line on the sonar plot
  
@@ -363,7 +363,7 @@ class echogramPlotter:
                     self.minTargetRange = min(self.rangeRing1.range, self.rangeRing2.range)
                     self.maxTargetRange = max(self.rangeRing1.range, self.rangeRing2.range)
                     
-                    print('Range rings: {}, {}'.format(self.minTargetRange, self.maxTargetRange))
+                    #print('Range rings: {}, {}'.format(self.minTargetRange, self.maxTargetRange))
                 
                     minSample = np.int(np.floor(2*self.minTargetRange / (samInt * c)))
                     maxSample = np.int(np.floor(2*self.maxTargetRange / (samInt * c)))
@@ -468,14 +468,8 @@ class echogramPlotter:
     def updateBeamNum(self, theta):
         # gets the beam number from the beam line angle and the latest theta
         
-
         # set beamLineAngle from the angle of the line on the sonar plot
-        # Weirdly, the angles that we want to be from -180 to +180 actually go
-        # from -180 to 90 and then -270 to -180. Fix this here (but work in radians)
         self.beamLineAngle = self.beamLine.value
-
-        if self.beamLineAngle < -np.pi:
-            self.beamLineAngle += 2*np.pi
         
         idx = (np.abs(theta - self.beamLineAngle)).argmin()
         self.beam = idx
@@ -540,11 +534,13 @@ class draggable_ring:
         self.c.mpl_disconnect(self.follower)
 
 class draggable_radial:
-    def __init__(self, ax, angle, maxRange):
+    def __init__(self, ax, angle, maxRange, theta):
         self.ax = ax
         self.c = ax.get_figure().canvas
         self.angle = angle
         self.maxRange = maxRange
+        self.theta = theta # the sonar-provided beam pointing angles.
+        
         self.value = 0.0 # is updated to a true value once data is received
 
         self.line = lines.Line2D([self.angle, self.angle], [0, self.maxRange], 
@@ -560,7 +556,17 @@ class draggable_radial:
             self.releaser = self.c.mpl_connect("button_press_event", self.releaseonclick)
 
     def followmouse(self, event):
-        self.line.set_data([event.xdata, event.xdata], [0, self.maxRange])
+        # snap the beam line to beam centres (make it easier to get the beam
+        # line on a specific beam in the sonar display)
+
+        # Weirdly, the angles that we want to be from -180 to +180 actually go
+        # from -180 to 90 and then -270 to -180. Fix this here (but work in radians)
+        if event.xdata < -np.pi:
+            event.xdata += 2*np.pi
+
+        idx = (np.abs(self.theta - event.xdata)).argmin()
+        snappedAngle = self.theta[idx]
+        self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
         self.c.draw_idle()
 
     def releaseonclick(self, event):
