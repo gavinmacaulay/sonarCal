@@ -140,6 +140,7 @@ def file_listen(watchDir):
         
         # convert x,y,z direction into a horizontal angle for use elsewhere
         theta = np.arctan2(y, x)
+        theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
         
         samInt = f['Sonar/Beam_group1/sample_interval'][-1]
         c = f['Environment/sound_speed_indicative'][()]
@@ -196,7 +197,9 @@ class echogramPlotter:
     def __init__(self, numPings, maxRange, maxSv, minSv):
         # Various user-changable lines on the plots that could in the future 
         # come from a config file.
-        self.beam = 25;
+        self.beamLineAngle = 0 # [deg]
+        self.beam = 0 # dummy value. Is updated once some data is received.
+
         self.minTargetRange = 20;
         self.maxTargetRange = 30;
 
@@ -307,10 +310,12 @@ class echogramPlotter:
                             shading='auto', vmin=self.minSv, vmax=self.maxSv)
         
         # range rings on the polar plot
-        #self.minRangeRing = draggable_ring(self.polarPlotAx, self.minTargetRange)
-        #self.maxRangeRing = draggable_ring(self.polarPlotAx, self.maxTargetRange)
-        #self.beamLine = draggable_radial(self.polarPlotAx, beamLineAngle, self.maxRange)
-  
+        self.rangeRing1 = draggable_ring(self.polarPlotAx, self.minTargetRange)
+        self.rangeRing2 = draggable_ring(self.polarPlotAx, self.maxTargetRange)
+        self.beamLine = draggable_radial(self.polarPlotAx, self.beamLineAngle, self.maxRange)
+        
+        self.updateBeamNum(theta) # sets self.beam from the positon of the radial line on the sonar plot
+ 
         # Plot labels
         self.stbdEchogramAx.set_xlabel('Pings')
         
@@ -353,25 +358,30 @@ class echogramPlotter:
                     # Update the plots with the data in the new ping
                     pingTime = datetime(1601,1,1) + timedelta(microseconds=t/1000.0)
                     timeBehind = datetime.now() - pingTime
-                    label.config(text='Ping at {}, ({:.1f} seconds ago)'.format(pingTime, timeBehind.total_seconds()))
+                    label.config(text='Ping at {} ({:.1f} seconds ago)'.format(pingTime, timeBehind.total_seconds()))
                 
-
+                    self.minTargetRange = min(self.rangeRing1.range, self.rangeRing2.range)
+                    self.maxTargetRange = max(self.rangeRing1.range, self.rangeRing2.range)
+                    
+                    print('Range rings: {}, {}'.format(self.minTargetRange, self.maxTargetRange))
+                
                     minSample = np.int(np.floor(2*self.minTargetRange / (samInt * c)))
                     maxSample = np.int(np.floor(2*self.maxTargetRange / (samInt * c)))
                     
-                    #self.beam = beamLineAngle + theta
+                    self.updateBeamNum(theta) # sets self.beam from self.beamLineAngle
                     
                     # work out the beam indices
                     if self.beam == 0:
                         beamPort = self.numBeams-1
                     else:
-                        beamPort = self.beam+1
+                        beamPort = self.beam-1
                         
                     if self.beam == self.numBeams-1:
                         beamStbd = 0
                     else:
-                        beamStbd = self.beam-1
+                        beamStbd = self.beam+1
                         
+                    #print('{}, {}, {}'.format(beamPort, self.beam, beamStbd))
                     # Find the max amplitude between the min and max ranges set by the UI 
                     # and store for plotting
                     self.amp = np.roll(self.amp, -1, 1)
@@ -435,7 +445,7 @@ class echogramPlotter:
                         else:
                             samples = b.shape[0]
                             self.polar[:,i] = np.concatenate((b, -1.0*np.ones(1, self.maxSamples-samples)), 1)
-                    #print(self.polar)
+
                     self.polarPlot.set_array(self.polar.ravel())
                     
                 # except:  # if anything goes wrong, just ignore it...
@@ -454,7 +464,22 @@ class echogramPlotter:
             samples = pingData.shape[0]
             data[:,-1] = np.concatenate((pingData[:], -1.0*np.ones(1,self.maxSamples-samples)), axis=0)
         return data
-       
+    
+    def updateBeamNum(self, theta):
+        # gets the beam number from the beam line angle and the latest theta
+        
+
+        # set beamLineAngle from the angle of the line on the sonar plot
+        # Weirdly, the angles that we want to be from -180 to +180 actually go
+        # from -180 to 90 and then -270 to -180. Fix this here (but work in radians)
+        self.beamLineAngle = self.beamLine.value
+
+        if self.beamLineAngle < -np.pi:
+            self.beamLineAngle += 2*np.pi
+        
+        idx = (np.abs(theta - self.beamLineAngle)).argmin()
+        self.beam = idx
+        #print('new beam is {}'.format(self.beam))
         
 def to_float(x):
     try:
@@ -489,8 +514,11 @@ class draggable_ring:
         self.ax = ax
         self.c = ax.get_figure().canvas
         self.range = range
+        self.numPoints = 50 # used to draw the range circle
 
-        self.line = lines.Line2D(np.arange(0,360), np.ones(360)*self.range, linewidth=0.2, color='k', picker=True)
+        self.line = lines.Line2D(np.linspace(-np.pi,np.pi, num=self.numPoints), 
+                                 np.ones(self.numPoints)*self.range, 
+                                 linewidth=1, color='k', picker=True)
         self.line.set_pickradius(5)
         self.ax.add_line(self.line)
         self.c.draw_idle()
@@ -498,22 +526,15 @@ class draggable_ring:
 
     def clickonline(self, event):
         if event.artist == self.line:
-            print("line selected ", event.artist)
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
             self.releaser = self.c.mpl_connect("button_press_event", self.releaseonclick)
-        else:
-            print('line not selected')
 
     def followmouse(self, event):
-        print(event.ydata)
-        print(event.xdata)
-        self.line.set_ydata([event.ydata, event.ydata])
+        self.line.set_ydata(np.ones(self.numPoints)*event.ydata)
         self.c.draw_idle()
 
     def releaseonclick(self, event):
-        self.value = self.line.get_ydata()[0]
- 
-        #print (self.value)
+        self.range = self.line.get_ydata()[0]
 
         self.c.mpl_disconnect(self.releaser)
         self.c.mpl_disconnect(self.follower)
@@ -524,8 +545,10 @@ class draggable_radial:
         self.c = ax.get_figure().canvas
         self.angle = angle
         self.maxRange = maxRange
+        self.value = 0.0 # is updated to a true value once data is received
 
-        self.line = lines.Line2D([self.angle, self.angle], [0, self.maxRange], color='k', picker=True)
+        self.line = lines.Line2D([self.angle, self.angle], [0, self.maxRange], 
+                                 linewidth=1, color='k', picker=True)
         self.line.set_pickradius(5)
         self.ax.add_line(self.line)
         self.c.draw_idle()
@@ -533,27 +556,18 @@ class draggable_radial:
 
     def clickonline(self, event):
         if event.artist == self.line:
-            print("line selected ", event.artist)
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
             self.releaser = self.c.mpl_connect("button_press_event", self.releaseonclick)
-        else:
-            print('line not selected')
 
     def followmouse(self, event):
-        print(event.ydata)
-        print(event.xdata)
-        self.line.set_ydata([event.ydata, event.ydata])
+        self.line.set_data([event.xdata, event.xdata], [0, self.maxRange])
         self.c.draw_idle()
 
     def releaseonclick(self, event):
-        self.value = self.line.get_ydata()[0]
- 
-        #print (self.value)
-
+        self.value = self.line.get_xdata()[0]
+        
         self.c.mpl_disconnect(self.releaser)
         self.c.mpl_disconnect(self.follower)
-
-
 
 if __name__== "__main__":
     #warnings.simplefilter('error', UserWarning)
