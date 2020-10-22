@@ -313,6 +313,7 @@ class echogramPlotter:
         self.polarPlotAx.set_theta_offset(np.pi/2)
         self.polarPlotAx.set_theta_direction(-1)
         self.polarPlotAx.set_frame_on(False)
+        self.polarPlotAx.xaxis.set_ticklabels([])
 
         r = np.arange(0,self.maxSamples)*samInt*c/2.0
         self.polarPlot = self.polarPlotAx.pcolormesh(theta, r, self.polar, 
