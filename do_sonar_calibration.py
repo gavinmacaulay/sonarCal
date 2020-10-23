@@ -301,9 +301,9 @@ class echogramPlotter:
         
         # Echogram for 3 beams
         ee = [0.0, self.numPings, self.maxRange, 0.0]
-        self.portEchogram = self.portEchogramAx.imshow(self.port, aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
-        self.mainEchogram = self.mainEchogramAx.imshow(self.main, aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
-        self.stbdEchogram = self.stbdEchogramAx.imshow(self.stbd, aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
+        self.portEchogram = self.portEchogramAx.imshow(self.port, interpolation='nearest', aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
+        self.mainEchogram = self.mainEchogramAx.imshow(self.main, interpolation='nearest', aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
+        self.stbdEchogram = self.stbdEchogramAx.imshow(self.stbd, interpolation='nearest', aspect='auto', extent=ee, vmin=self.minSv, vmax=self.maxSv)
         
         self.portEchogram.set_cmap(cmap)
         self.mainEchogram.set_cmap(cmap)
@@ -346,7 +346,7 @@ class echogramPlotter:
         self.stbdEchogramAx.set_ylabel('Depth (m)')
         
         self.ampDiffPlotAx.set_xlabel('Pings')
-        self.ampPlotAx.set_ylabel('TS (dB)')
+        self.ampPlotAx.set_ylabel('TS (dB re 1 $m^2$)')
         self.ampDiffPlotAx.set_ylabel(r'$\Delta$ (dB)')
         self.ampPlotAx.set_title('Maximum amplitude at 0 m')
 
