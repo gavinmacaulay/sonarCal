@@ -23,9 +23,11 @@ to select the beam being calibrated and the range bounds of the calibration sphe
 
 ## Configuration
 
-Configuration of the program is done by editing the program file. All user-changeable variables are at the top of the file:
+Configuration of the program is done by editing the config file (usually called ``sonar_calibration.ini``). The config parameters are:
 - The directory where the sonar data files are created by the sonar (``watchDir``),
 - The location of log files (``logDir``),
-- The number of pings shown in the echograms (``numPings``),
-- The maximum range of the echograms (``maxRange``), and 
+- The NetCDF4 group name for the horizontal sonar beams (``horizontalBeamGroupPath``),
+- Whether to expect live data or whether to replay all the pings in the last file in ``watchDir`` (``liveData`` - set to ``yes`` or ``no``),
+- The number of pings shown in the echograms (``numPingsToShow``),
+- The maximum range of the echograms (``maxRange``), and
 - The mininium and maximum Sv values used in the colormap (``minSv`` and ``maxSv``).
