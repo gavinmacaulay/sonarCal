@@ -169,11 +169,7 @@ def file_listen(watchDir, beamGroup):
                 t = f[beamGroup + '/ping_time'][-1]
                 
                 if t > t_previous: # there is a new ping in the file
-                    dr = f[beamGroup + '/backscatter_r'][-1]
-                    # take log of dr to make the rest of the code simplier
-                    with np.errstate(divide='ignore'): # usually some zeros in the data of no real consequence, so ignore them
-                        for j in range(0, dr.shape[0]):
-                            dr[j] = np.log10(dr[j])
+                    sv = SvFromSonarNetCDF4(f, beamGroup, -1)
                     
                     x = f[beamGroup + '/beam_direction_x'][-1]
                     y = f[beamGroup + '/beam_direction_y'][-1]
@@ -188,7 +184,7 @@ def file_listen(watchDir, beamGroup):
                     t_previous = t
                     noNewDataCount = 0 # reset the count
                     # send the data off to be plotted
-                    queue.put((t,samInt,c,dr,theta))
+                    queue.put((t,samInt,c,sv,theta))
                 else:
                     noNewDataCount += 1
                     if noNewDataCount > maxNoNewDataCount:
@@ -196,7 +192,7 @@ def file_listen(watchDir, beamGroup):
 
                 f.close()
                 # try this instead of opening and closing the file
-                # t.id.refresh(), dr.id.refresh(), etc
+                # t.id.refresh(), etc
                 sleep(waitInterval)
             
 
@@ -217,12 +213,7 @@ def file_replay(watchDir, beamGroup):
     # Send off each ping at a sedate rate...
     for i in range(0, t.shape[0]):
         #print('ping')
-        dr = f[beamGroup + '/backscatter_r'][i]
-        # take log of dr to make the rest of the code simplier
-        with np.errstate(divide='ignore'): # usually some zeros in the data of no real consequence, so ignore them
-            for j in range(0,dr.shape[0]):
-                dr[j] = np.log10(dr[j])
-            
+        sv = SvFromSonarNetCDF4(f, beamGroup, i)
         x = f[beamGroup + '/beam_direction_x'][i]
         y = f[beamGroup + '/beam_direction_y'][i]
         
@@ -234,13 +225,88 @@ def file_replay(watchDir, beamGroup):
         c = f['Environment/sound_speed_indicative'][()]
 
         # send the data off to be plotted
-        queue.put((t[i],samInt,c,dr,theta))
+        queue.put((t[i],samInt,c,sv,theta))
 
         sleep(1.0)
     f.close()
     
     logging.info('Finished replaying file: ' + str(mostRecentFile))
 
+def SvFromSonarNetCDF4(f, beamGroup, i):
+    # Calculate Sv from the given beam group and ping.
+    
+    eqn_type = f[beamGroup].attrs['conversion_equation_type'].decode('utf-8')
+
+    # currently only support type 2 Sv calculations (Furuno omnisonars)    
+    if eqn_type == 'type_2':
+
+        # Pick out various variables for the given ping, i
+        sv = f[beamGroup + '/backscatter_r'][i] # an array for each beam
+        tau_e = f[beamGroup + '/transmit_duration_equivalent'][i] # a scaler for the current ping
+        Psi = f[beamGroup + '/equivalent_beam_angle'][i] # a scalar for each beam
+        SL = f[beamGroup + '/transmit_source_level'][i] # a scalar for the current ping
+        K = f[beamGroup + '/receiver_sensitivity'][i] # a scalar for each beam
+        deltaG = f[beamGroup + '/gain_correction'][i] # a scalar for each beam
+        G_T = f[beamGroup + '/time_varied_gain'][i] # a value for each sample in the current ping
+        ping_freq_1 = f[beamGroup + '/transmit_frequency_start'][i] # a scalar for each beam
+        ping_freq_2 = f[beamGroup + '/transmit_frequency_stop'][i] # a scalar for each beam
+
+        # and some more constant things that could be moved out of this function...
+        c = f['Environment/sound_speed_indicative'][()] # a scalar
+        alpha_vector = f['Environment/absorption_indicative'][()] # a vector
+        freq_vector = f['Environment/frequency'][()] # a vector
+        ping_freq = (ping_freq_1 + ping_freq_2)/2.0 # a scalar for each beam
+        alpha = np.interp(ping_freq, freq_vector, alpha_vector) # a scalar for each beam
+    
+        # some files have nan for some of the above variables, so fix that
+        if np.any(np.isnan(deltaG), where=True):
+            deltaG = np.zeros(deltaG.shape)
+        if np.any(np.isnan(alpha_vector), where=True):
+            # quick and dirty...
+            alpha = acousticAbsorption(10.0, 35.0, 10.0, ping_freq) 
+    
+        a = 10.0 * np.log10(c * tau_e * Psi / 2.0) + SL + K + deltaG #  a scalar for each beam
+        r_offset = 0.25 * c * tau_e
+        
+        samInt = f[beamGroup + '/sample_interval'][i] # [s]
+        
+        with np.errstate(divide='ignore', invalid='ignore'): # usually some zeros in the data of no real consequence
+            for j in range(0, sv.shape[0]): # loop over each beam
+                r = samInt * c/2.0 * np.arange(0, sv[j].size) - r_offset # [m] range vector for the current beam
+                sv[j] = 20.0*np.log10(sv[j]/np.sqrt(2.0)) + 20.0*np.log10(r) + 2*alpha[j]*r - a[j] + G_T
+
+    else: # unsupported format - just take the log10 of the numbers. Usually usefull.
+        sv = f[beamGroup + '/backscatter_r'][i]
+        with np.errstate(divide='ignore'):
+            for j in range(0, sv.shape[0]):
+                sv[j] = np.log10(sv[j])
+                
+    return sv
+
+def acousticAbsorption(temperature, salinity, depth, frequency)               :
+    """ simple acoustic absorption calculations for when it's not in the 
+        sonar files. Uses Ainslie & McColm, 1998.
+        Units are:
+            temperature - degC
+            salinity - PSU
+            depth - m
+            frequency - Hz
+            alpha - dB/m
+    """
+    frequency = frequency / 1e3 # [kHz]
+    pH = 8.0
+    
+    z = depth/1e3 # [km]
+    f1 = 0.78 * np.sqrt(salinity/35.0) * np.exp(temperature/26.0)
+    f2 = 42.0 * np.exp(temperature/17.0)
+    alpha = 0.106 * (f1*frequency**2./(frequency**2+f1**2)) * np.exp((pH-8.0)/0.56) \
+            + 0.52*(1+temperature/43.0) * (salinity/35.0) \
+            * (f2*frequency**2)/(frequency**2+f2**2) * np.exp(z/6.0) \
+            + 0.00049*frequency**2 * np.exp(-(temperature/27.0+z/17.0))
+    alpha = alpha * 1e-3 # [dB/m]
+    
+    
+    return alpha
 
 class echogramPlotter:
     "Receive via a queue new ping data and use that to update the display"
