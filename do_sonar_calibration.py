@@ -314,12 +314,12 @@ class echogramPlotter:
     def __init__(self, numPings, maxRange, maxSv, minSv):
         # Various user-changable lines on the plots that could in the future 
         # come from a config file.
-        self.beamLineAngle = 0 # [deg]
-        self.beam = 0 # dummy value. Is updated once some data is received.
-
-        self.minTargetRange = 20;
-        self.maxTargetRange = 30;
-
+        self.beamLineAngle = 0.0 # [deg]
+        self.beam = 0 # dummy value. Is updated once some data are received.
+        
+        self.minTargetRange = 0.33*maxRange
+        self.maxTargetRange = 0.66*maxRange
+        
         self.numPings = numPings # to show in the echograms
         self.maxRange = maxRange # [m] of the echograms
         self.maxSv = maxSv # [dB] max Sv to show in the echograms
