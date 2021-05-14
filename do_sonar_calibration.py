@@ -259,9 +259,9 @@ def SvFromSonarNetCDF4(f, beamGroup, i):
         alpha = np.interp(ping_freq, freq_vector, alpha_vector) # a scalar for each beam
     
         # some files have nan for some of the above variables, so fix that
-        if np.any(np.isnan(deltaG), where=True):
+        if np.any(np.isnan(deltaG)):
             deltaG = np.zeros(deltaG.shape)
-        if np.any(np.isnan(alpha_vector), where=True):
+        if np.any(np.isnan(alpha_vector)):
             # quick and dirty...
             alpha = acousticAbsorption(10.0, 35.0, 10.0, ping_freq) 
     
