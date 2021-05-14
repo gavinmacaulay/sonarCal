@@ -144,7 +144,7 @@ def file_listen(watchDir, beamGroup):
     
     # Config how and when to give up looking for new data in an existing file.    
     maxNoNewDataCount = 20 # number of tries to find new pings in an existing file
-    waitInterval = 0.3 # [s] time period between checking for new pings
+    waitInterval = 0.5 # [s] time period between checking for new pings
     waitIntervalFile = 1.0 # [s] time period between checking for new files
 
     t_previous = 0 # timestamp of previous ping
@@ -163,7 +163,7 @@ def file_listen(watchDir, beamGroup):
         
             while noNewDataCount <= maxNoNewDataCount:
                 # open netcdf file
-                f = h5py.File(mostRecentFile, 'r')
+                f = h5py.File(mostRecentFile, 'r', libver='latest', swmr=True)
                 f_previous = mostRecentFile
             
                 t = f[beamGroup + '/ping_time'][-1]
