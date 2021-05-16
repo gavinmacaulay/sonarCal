@@ -175,6 +175,9 @@ def file_listen(watchDir, beamGroup):
                     t = f[beamGroup + '/ping_time'][pingIndex]
                     
                     if t > t_previous: # there is a new ping in the file
+                        pingTime = datetime(1601,1,1) + timedelta(microseconds=t/1000.0)
+                        logging.info('Starting read ping from time {}'.format(pingTime))
+                        
                         sv = SvFromSonarNetCDF4(f, beamGroup, pingIndex)
                         
                         x = f[beamGroup + '/beam_direction_x'][pingIndex]
@@ -189,12 +192,14 @@ def file_listen(watchDir, beamGroup):
                         
                         t_previous = t
                         noNewDataCount = 0 # reset the count
+                        
+                        logging.info('Finished reading ping from time {}'.format(pingTime))
                         # send the data off to be plotted
                         queue.put((t,samInt,c,sv,theta))
                     else:
                         noNewDataCount += 1
                         if noNewDataCount > maxNoNewDataCount:
-                            logging.info(f'No new data found in file {mostRecentFile.name} after {noNewDataCount * waitInterval} s.')
+                            logging.info(f'No new data found in file {mostRecentFile.name} after waiting {noNewDataCount * waitInterval} s.')
     
                     f.close()
                     # try this instead of opening and closing the file
@@ -504,6 +509,7 @@ class echogramPlotter:
                     pingTime = datetime(1601,1,1) + timedelta(microseconds=t/1000.0)
                     timeBehind = datetime.now() - pingTime
                     label.config(text='Ping at {} ({:.1f} seconds ago)'.format(pingTime, timeBehind.total_seconds()))
+                    logging.info(f'Displaying ping that occurred at {pingTime}.')
                 
                     self.minTargetRange = min(self.rangeRing1.range, self.rangeRing2.range)
                     self.maxTargetRange = max(self.rangeRing1.range, self.rangeRing2.range)
