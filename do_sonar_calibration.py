@@ -146,6 +146,9 @@ def file_listen(watchDir, beamGroup):
     maxNoNewDataCount = 20 # number of tries to find new pings in an existing file
     waitInterval = 0.5 # [s] time period between checking for new pings
     waitIntervalFile = 1.0 # [s] time period between checking for new files
+    errorWaitInterval = 0.2 # [s] time period to wait if there is a file read error
+
+    pingIndex = -1 # which ping in the file to read. -1 means the last ping, -2 the second to last ping
 
     t_previous = 0 # timestamp of previous ping
     f_previous = '' # previously used file
@@ -154,6 +157,7 @@ def file_listen(watchDir, beamGroup):
         # Find the most recent file in the directory
         files = sorted(list(watchDir.glob('*.nc')))   
         mostRecentFile = files[-1]
+        
         if mostRecentFile == f_previous: # no new file was found
             logging.info('No newer file found. Will try again in ' + str(waitIntervalFile) + ' s.')
             sleep(waitIntervalFile) # wait and try again
@@ -163,38 +167,47 @@ def file_listen(watchDir, beamGroup):
         
             while noNewDataCount <= maxNoNewDataCount:
                 # open netcdf file
-                f = h5py.File(mostRecentFile, 'r', libver='latest', swmr=True)
-                f_previous = mostRecentFile
-            
-                t = f[beamGroup + '/ping_time'][-1]
+                try:
+                    f = h5py.File(mostRecentFile, 'r', libver='latest', swmr=True)
+                    #f = h5py.File(mostRecentFile, 'r') # without HDF5 swmr option
+                    f_previous = mostRecentFile
                 
-                if t > t_previous: # there is a new ping in the file
-                    sv = SvFromSonarNetCDF4(f, beamGroup, -1)
+                    t = f[beamGroup + '/ping_time'][pingIndex]
                     
-                    x = f[beamGroup + '/beam_direction_x'][-1]
-                    y = f[beamGroup + '/beam_direction_y'][-1]
+                    if t > t_previous: # there is a new ping in the file
+                        sv = SvFromSonarNetCDF4(f, beamGroup, pingIndex)
+                        
+                        x = f[beamGroup + '/beam_direction_x'][pingIndex]
+                        y = f[beamGroup + '/beam_direction_y'][pingIndex]
+                        
+                        # convert x,y,z direction into a horizontal angle for use elsewhere
+                        theta = np.arctan2(y, x)
+                        theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
+                        
+                        samInt = f[beamGroup + '/sample_interval'][pingIndex]
+                        c = f['Environment/sound_speed_indicative'][()]
+                        
+                        t_previous = t
+                        noNewDataCount = 0 # reset the count
+                        # send the data off to be plotted
+                        queue.put((t,samInt,c,sv,theta))
+                    else:
+                        noNewDataCount += 1
+                        if noNewDataCount > maxNoNewDataCount:
+                            logging.info(f'No new data found in file {mostRecentFile.name} after {noNewDataCount * waitInterval} s.')
+    
+                    f.close()
+                    # try this instead of opening and closing the file
+                    # t.id.refresh(), etc
+                    sleep(waitInterval)
+                except OSError:
+                    f.close() # just in case...
+                    e = sys.exc_info()
+                    logging.warning('OSError when reading netCDF4 file:')
+                    logging.warning(e)
+                    logging.waring('Ignoring the above and trying again.')
+                    sleep(errorWaitInterval)
                     
-                    # convert x,y,z direction into a horizontal angle for use elsewhere
-                    theta = np.arctan2(y, x)
-                    theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
-                    
-                    samInt = f[beamGroup + '/sample_interval'][-1]
-                    c = f['Environment/sound_speed_indicative'][()]
-                    
-                    t_previous = t
-                    noNewDataCount = 0 # reset the count
-                    # send the data off to be plotted
-                    queue.put((t,samInt,c,sv,theta))
-                else:
-                    noNewDataCount += 1
-                    if noNewDataCount > maxNoNewDataCount:
-                        logging.info(f'No new data found in file {mostRecentFile.name} after {noNewDataCount * waitInterval} s.')
-
-                f.close()
-                # try this instead of opening and closing the file
-                # t.id.refresh(), etc
-                sleep(waitInterval)
-            
 
 def file_replay(watchDir, beamGroup):
     "Replay all data in the newest file. Used for testing."
@@ -477,10 +490,10 @@ class echogramPlotter:
             try:
                 message = queue.get(block=False)
             except Empty:
-                    print('no new data')
+                    logging.info('No new data in received message.')
                     pass
             else:
-                #try:
+                try:
                     (t, samInt, c, backscatter, theta) = message
                     
                     if self.firstPing:
@@ -569,7 +582,7 @@ class echogramPlotter:
                     self.portEchogramAx.set_title('Beam {} (port)'.format(beamPort), loc='left')
                     self.mainEchogramAx.set_title('Beam {}'.format(self.beam), loc='left')
                     self.stbdEchogramAx.set_title('Beam {} (starboard)'.format(beamStbd), loc='left')
-                    
+
                     # Polar plot
                     for i, b in enumerate(backscatter):
                         if b.shape[0] > self.maxSamples:
@@ -580,11 +593,12 @@ class echogramPlotter:
 
                     self.polarPlot.set_array(self.polar.ravel())
                     
-                # except:  # if anything goes wrong, just ignore it...
-                #     e = sys.exc_info()
-                #     logging.warning('Error when processing and displaying echo data. Waiting for next ping.')
-                #     logging.warning(e)  
-                #     pass
+                except:  # if anything goes wrong, just ignore it...
+                    e = sys.exc_info()
+                    logging.warning('Error when processing and displaying echo data:')
+                    logging.warning(e)  
+                    logging.warning('Ignoring the above and waiting for next ping.')
+                    pass
         global job
         job = root.after(self.checkQueueInterval, self.newPing, root, label)
             
