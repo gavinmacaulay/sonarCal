@@ -176,7 +176,7 @@ def file_listen(watchDir, beamGroup):
                     
                     if t > t_previous: # there is a new ping in the file
                         pingTime = datetime(1601,1,1) + timedelta(microseconds=t/1000.0)
-                        logging.info('Starting read ping from time {}'.format(pingTime))
+                        logging.info('Start reading ping from time {}'.format(pingTime))
                         
                         sv = SvFromSonarNetCDF4(f, beamGroup, pingIndex)
                         
