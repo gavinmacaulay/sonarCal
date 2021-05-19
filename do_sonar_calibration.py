@@ -155,8 +155,13 @@ def file_listen(watchDir, beamGroup):
    
     while True: # could add a timeout on this loop...
         # Find the most recent file in the directory
-        files = sorted(list(watchDir.glob('*.nc')))   
-        mostRecentFile = files[-1]
+        while True:
+            files = sorted(list(watchDir.glob('*.nc')))   
+            if files:
+                mostRecentFile = files[-1]
+                break
+            logging.info(f'No .nc file found in {watchDir}.')
+            sleep(waitIntervalFile)
         
         if mostRecentFile == f_previous: # no new file was found
             logging.info('No newer file found. Will try again in ' + str(waitIntervalFile) + ' s.')
@@ -217,10 +222,17 @@ def file_listen(watchDir, beamGroup):
 def file_replay(watchDir, beamGroup):
     "Replay all data in the newest file. Used for testing."
     
+    waitIntervalFile = 1.0 # [s] time period between checking for new files
+        
     # Find the most recent file in the directory
-    files = sorted(list(watchDir.glob('*.nc')))
-    mostRecentFile = files[-1]
-    
+    while True:
+        files = sorted(list(watchDir.glob('*.nc')))   
+        if files:
+            mostRecentFile = files[-1]
+            break
+        logging.info(f'No .nc file found in {watchDir}.')
+        sleep(waitIntervalFile)
+        
     logging.info('Listening to file: {}.'.format(mostRecentFile))
     
     # open netcdf file
@@ -599,6 +611,12 @@ class echogramPlotter:
 
                     self.polarPlot.set_array(self.polar.ravel())
                     
+                    # This line is necessary to get updates of the plot shown when the
+                    # program is run from within Spyder. Including has the side effect
+                    # that if there are continuous GUI events, the plots don't get updated
+                    # until the GUI events slow down...
+                    self.fig.canvas.draw()
+
                 except:  # if anything goes wrong, just ignore it...
                     e = sys.exc_info()
                     logging.warning('Error when processing and displaying echo data:')
@@ -670,8 +688,9 @@ class draggable_ring:
             self.releaser = self.c.mpl_connect("button_press_event", self.releaseonclick)
 
     def followmouse(self, event):
-        self.line.set_ydata(np.ones(self.numPoints)*float(event.ydata))
-        self.c.draw_idle()
+        if event.ydata is not None:
+            self.line.set_ydata(np.ones(self.numPoints)*float(event.ydata))
+            self.c.draw_idle()
 
     def releaseonclick(self, event):
         self.range = self.line.get_ydata()[0]
@@ -706,16 +725,17 @@ class draggable_radial:
         # snap the beam line to beam centres (make it easier to get the beam
         # line on a specific beam in the sonar display)
 
-        # Weirdly, the angles that we want to be from -180 to +180 actually go
-        # from -180 to 90 and then -270 to -180. Fix this here (but work in radians).
-        x = float(event.xdata)
-        if x < -np.pi:
-            x += 2*np.pi
+        if event.xdata is not None:
+            # Weirdly, the angles that we want to be from -180 to +180 actually go
+            # from -180 to 90 and then -270 to -180. Fix this here (but work in radians).
+            x = float(event.xdata)
+            if x < -np.pi:
+                x += 2*np.pi
 
-        idx = (np.abs(self.theta - x)).argmin()
-        snappedAngle = self.theta[idx]
-        self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
-        self.c.draw_idle()
+            idx = (np.abs(self.theta - x)).argmin()
+            snappedAngle = self.theta[idx]
+            self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
+            self.c.draw_idle()
 
     def releaseonclick(self, event):
         self.value = self.line.get_xdata()[0]
