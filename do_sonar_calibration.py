@@ -215,7 +215,7 @@ def file_listen(watchDir, beamGroup):
                     e = sys.exc_info()
                     logging.warning('OSError when reading netCDF4 file:')
                     logging.warning(e)
-                    logging.waring('Ignoring the above and trying again.')
+                    logging.warning('Ignoring the above and trying again.')
                     sleep(errorWaitInterval)
                     
 
