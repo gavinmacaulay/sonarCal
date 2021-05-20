@@ -519,7 +519,7 @@ class echogramPlotter:
                     
                     # Update the plots with the data in the new ping
                     pingTime = datetime(1601,1,1) + timedelta(microseconds=t/1000.0)
-                    timeBehind = datetime.now() - pingTime
+                    timeBehind = datetime.utcnow() - pingTime
                     label.config(text='Ping at {} ({:.1f} seconds ago)'.format(pingTime, timeBehind.total_seconds()))
                     logging.info(f'Displaying ping that occurred at {pingTime}.')
                 
