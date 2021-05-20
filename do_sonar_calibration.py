@@ -379,11 +379,11 @@ class echogramPlotter:
         
         # Storage for the things we plot
         # Polar plot
-        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * -1.
+        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * self.minSv - 1.
         # Echograms
-        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * -1.
-        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * -1.
-        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * -1.
+        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * self.minSv - 1.
+        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * self.minSv - 1.
+        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * self.minSv - 1.
         # Amplitude of sphere
         self.amp = np.ones((3, self.numPings), dtype=float) * np.nan
         self.ampSmooth = np.ones((3, self.numPings), dtype=float) * np.nan
