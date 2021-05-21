@@ -711,6 +711,10 @@ class draggable_radial:
 
         self.line = lines.Line2D([self.angle, self.angle], [0, self.maxRange], 
                                  linewidth=1, color='k', picker=True)
+        self.text = self.ax.text(self.angle, self.maxRange, '', \
+                    horizontalalignment = 'center', verticalalignment = 'center')
+        self.text.set_bbox(dict(color='w', alpha=0.5, boxstyle='round, rounding_size=0.6'))
+
         self.line.set_pickradius(5)
         self.ax.add_line(self.line)
         self.c.draw_idle()
@@ -735,6 +739,11 @@ class draggable_radial:
             idx = (np.abs(self.theta - x)).argmin()
             snappedAngle = self.theta[idx]
             self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
+
+            # update beam number display at the end of the radial line
+            self.text.set_position((snappedAngle, 1.12*self.maxRange))
+            self.text.set_text(f'{idx}')
+            
             self.c.draw_idle()
 
     def releaseonclick(self, event):
