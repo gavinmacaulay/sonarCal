@@ -374,16 +374,18 @@ class echogramPlotter:
         c#map.set_over('w') # values above self.maxSv show in white, if desired
         cmap.set_under('w') # and for values below self.minSv, if desired
         
+        lowestSv = -999.0
+        
         self.maxSamples = int(np.ceil(self.maxRange / (samInt*c/2.0))) # number of samples to store per ping
         self.numBeams = backscatter.shape[0]
         
         # Storage for the things we plot
         # Polar plot
-        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * self.minSv - 1.
+        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * lowestSv
         # Echograms
-        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * self.minSv - 1.
-        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * self.minSv - 1.
-        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * self.minSv - 1.
+        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * lowestSv
+        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * lowestSv
+        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * lowestSv
         # Amplitude of sphere
         self.amp = np.ones((3, self.numPings), dtype=float) * np.nan
         self.ampSmooth = np.ones((3, self.numPings), dtype=float) * np.nan
@@ -665,7 +667,7 @@ def setupLogging(log_dir, label):
     logger.addHandler(console)
     
     logging.info('Log files are in ' + log_dir.as_posix())
-      
+
 class draggable_ring:
     "Provides a range ring on a polar plot that the user can move with the mouse."
     def __init__(self, ax, range):
@@ -685,7 +687,7 @@ class draggable_ring:
     def clickonline(self, event):
         if event.artist == self.line:
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
-            self.releaser = self.c.mpl_connect("button_press_event", self.releaseonclick)
+            self.releaser = self.c.mpl_connect("button_release_event", self.releaseonclick)
 
     def followmouse(self, event):
         if event.ydata is not None:
@@ -723,7 +725,7 @@ class draggable_radial:
     def clickonline(self, event):
         if event.artist == self.line:
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
-            self.releaser = self.c.mpl_connect("button_press_event", self.releaseonclick)
+            self.releaser = self.c.mpl_connect("button_release_event", self.releaseonclick)
 
     def followmouse(self, event):
         # snap the beam line to beam centres (make it easier to get the beam
