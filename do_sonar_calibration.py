@@ -713,9 +713,10 @@ class draggable_radial:
 
         self.line = lines.Line2D([self.angle, self.angle], [0, self.maxRange], 
                                  linewidth=1, color='k', picker=True)
-        self.text = self.ax.text(self.angle, self.maxRange, '', \
+        self.text = self.ax.text(self.angle, 1.12*self.maxRange, '', \
                     horizontalalignment = 'center', verticalalignment = 'center')
         self.text.set_bbox(dict(color='w', alpha=0.5, boxstyle='round, rounding_size=0.6'))
+        self.snapAngle(self.angle)
 
         self.line.set_pickradius(5)
         self.ax.add_line(self.line)
@@ -737,7 +738,11 @@ class draggable_radial:
             x = float(event.xdata)
             if x < -np.pi:
                 x += 2*np.pi
-
+            self.snapAngle(x)
+            
+    def snapAngle(self, x):
+            # snap the mouse position to the cente of a beam, update the beam
+            # line and beam number text.
             idx = (np.abs(self.theta - x)).argmin()
             snappedAngle = self.theta[idx]
             self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
