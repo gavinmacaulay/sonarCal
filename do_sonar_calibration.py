@@ -351,6 +351,8 @@ class echogramPlotter:
         self.minTargetRange = 0.33*maxRange
         self.maxTargetRange = 0.66*maxRange
         
+        self.varNum = 5 # number of sphere values to use when calculating the ping-to-ping variability
+        
         self.diffPlotXlim = (-3,3) # [dB]
         
         self.numPings = numPings # to show in the echograms
@@ -378,7 +380,7 @@ class echogramPlotter:
         cmap.set_under('w') # and for values below self.minSv, if desired
         
         # initialisation value of echogram data
-        lowestSv = -999.0
+        emptySv = -999.0
         # the max extend of the threshodl range slider
         lowestSv = -100
         highestSv = 0
@@ -388,11 +390,11 @@ class echogramPlotter:
         
         # Storage for the things we plot
         # Polar plot
-        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * lowestSv
+        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * emptySv
         # Echograms
-        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * lowestSv
-        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * lowestSv
-        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * lowestSv
+        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * emptySv
+        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * emptySv
+        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * emptySv
         # Amplitude of sphere
         self.amp = np.ones((3, self.numPings), dtype=float) * np.nan
         self.ampSmooth = np.ones((3, self.numPings), dtype=float) * np.nan
@@ -448,7 +450,8 @@ class echogramPlotter:
         self.ampPlotLineStbdSmooth, = self.ampPlotAx.plot(self.ampSmooth[2,:], 'g-', linewidth=2)
         self.ampPlotAx.set_xlim(0, self.numPings)
         # a informative number on the TS plot
-        self.diffVariability = self.ampPlotAx.text(50, -26, 'test')
+        self.diffVariability = self.ampPlotAx.text(0.05, 0.95, '', ha='left', va='top', transform=self.ampPlotAx.transAxes)
+        self.diffVariability.set_bbox(dict(color='w', alpha=0.5))
         
         # Difference in sphere TS from the 3 beams
         self.ampDiffPortPlot, = self.ampDiffPlotAx.plot(self.ampDiffPort, 'r-', linewidth=1)
@@ -493,7 +496,7 @@ class echogramPlotter:
         slider_ax = plt.axes([0.028, 0.20, 0.015, 0.65])
         self.slider = RangeSlider(slider_ax, "Thresholds", lowestSv, highestSv,
                                   valstep = np.arange(lowestSv, highestSv+1, 1),
-                                  orientation = 'vertical', facecolor = 'black')
+                                  orientation = 'vertical', facecolor = 'blue')
         self.slider.set_val((self.minSv, self.maxSv)) # using valinit in the constructor fails due to a bug, so use this workaround
         self.slider.on_changed(self.updateEchogramThresholds)
         
@@ -598,6 +601,10 @@ class echogramPlotter:
                     self.ampPlotLineStbd.set_ydata(self.amp[2,:])
                     # and smoothed plots
                     coeff = np.ones(self.movingAveragePoints)/self.movingAveragePoints
+                    # and measure of ping-to-ping variability
+                    variability = np.std(self.amp[1,-self.varNum:-1])
+                    if not np.isnan(variability):
+                        self.diffVariability.set_text(f'$\sigma$ = {variability:.1f} dB')
                     
                     self.ampSmooth[0,:] = signal.filtfilt(coeff, 1, self.amp[0,:])
                     self.ampSmooth[1,:] = signal.filtfilt(coeff, 1, self.amp[1,:])
