@@ -28,6 +28,7 @@ mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import matplotlib.lines as lines
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.widgets import RangeSlider
 from scipy import signal
 import tkinter.font as tkFont
 
@@ -350,6 +351,8 @@ class echogramPlotter:
         self.minTargetRange = 0.33*maxRange
         self.maxTargetRange = 0.66*maxRange
         
+        self.diffPlotXlim = (-3,3) # [dB]
+        
         self.numPings = numPings # to show in the echograms
         self.maxRange = maxRange # [m] of the echograms
         self.maxSv = maxSv # [dB] max Sv to show in the echograms
@@ -374,7 +377,11 @@ class echogramPlotter:
         c#map.set_over('w') # values above self.maxSv show in white, if desired
         cmap.set_under('w') # and for values below self.minSv, if desired
         
+        # initialisation value of echogram data
         lowestSv = -999.0
+        # the max extend of the threshodl range slider
+        lowestSv = -100
+        highestSv = 0
         
         self.maxSamples = int(np.ceil(self.maxRange / (samInt*c/2.0))) # number of samples to store per ping
         self.numBeams = backscatter.shape[0]
@@ -440,6 +447,8 @@ class echogramPlotter:
         self.ampPlotLineMainSmooth, = self.ampPlotAx.plot(self.ampSmooth[1,:], 'k-', linewidth=2)
         self.ampPlotLineStbdSmooth, = self.ampPlotAx.plot(self.ampSmooth[2,:], 'g-', linewidth=2)
         self.ampPlotAx.set_xlim(0, self.numPings)
+        # a informative number on the TS plot
+        self.diffVariability = self.ampPlotAx.text(50, -26, 'test')
         
         # Difference in sphere TS from the 3 beams
         self.ampDiffPortPlot, = self.ampDiffPlotAx.plot(self.ampDiffPort, 'r-', linewidth=1)
@@ -447,7 +456,8 @@ class echogramPlotter:
         # Smoothed curves of the difference in TS
         self.ampDiffPortPlotSmooth, = self.ampDiffPlotAx.plot(self.ampDiffPortSmooth, 'r-', linewidth=2)
         self.ampDiffStbdPlotSmooth, = self.ampDiffPlotAx.plot(self.ampDiffStbdSmooth, 'g-', linewidth=2)
-        self.ampDiffPlotAx.set_xlim(0, self.numPings) 
+        self.ampDiffPlotAx.set_xlim(0, self.numPings)
+        self.ampDiffPlotAx.set_ylim(self.diffPlotXlim)
         
         # Echograms for the 3 selected beams
         ee = [0.0, self.numPings, self.maxRange, 0.0]
@@ -475,8 +485,17 @@ class echogramPlotter:
 
         # Colorbar for the omni echogram
         cb = plt.colorbar(self.polarPlot, ax=self.polarPlotAx, orientation='horizontal',
-                          extend='both', fraction=0.05)
+                          extend='both', fraction=0.05, location='bottom')
         cb.set_label('Sv (dB re 1 $m^{-1}$)')
+        
+        # range slider to adjust the echogram thresholds
+
+        slider_ax = plt.axes([0.028, 0.20, 0.015, 0.65])
+        self.slider = RangeSlider(slider_ax, "Thresholds", lowestSv, highestSv,
+                                  valstep = np.arange(lowestSv, highestSv+1, 1),
+                                  orientation = 'vertical', facecolor = 'black')
+        self.slider.set_val((self.minSv, self.maxSv)) # using valinit in the constructor fails due to a bug, so use this workaround
+        self.slider.on_changed(self.updateEchogramThresholds)
         
         # Range rings on the omni echogram
         self.rangeRing1 = draggable_ring(self.polarPlotAx, self.minTargetRange)
@@ -484,7 +503,7 @@ class echogramPlotter:
         self.beamLine = draggable_radial(self.polarPlotAx, self.beamLineAngle, self.maxRange, theta)
         
         self.updateBeamNum(theta) # sets self.beam from the positon of the radial line on the sonar plot
- 
+
         # Axes labels
         self.stbdEchogramAx.set_xlabel('Pings')
         
@@ -501,7 +520,18 @@ class echogramPlotter:
         self.ampPlotAx.set_ylabel('TS (dB re 1 $m^2$)')
         self.ampDiffPlotAx.set_ylabel(r'$\Delta$ (dB)')
         self.ampPlotAx.set_title('Maximum amplitude at 0 m')
-    
+   
+    def updateEchogramThresholds(self, val):
+
+        # Update the image colormaps
+        self.polarPlot.set_clim(val)
+        self.portEchogram.set_clim(val)
+        self.mainEchogram.set_clim(val)
+        self.stbdEchogram.set_clim(val)
+        
+        # Redraw the figure to ensure it updates
+        self.fig.canvas.draw_idle()
+        
     def newPing(self, root, label):
         "Receives messages from the queue, decodes them and updates the echogram"
 
@@ -592,7 +622,7 @@ class echogramPlotter:
                     self.ampDiffStbdPlotSmooth.set_ydata(smStbd)
 
                     self.ampDiffPlotAx.relim()
-                    self.ampDiffPlotAx.autoscale_view()
+                    self.ampDiffPlotAx.autoscale_view(scaley=False)
                     
                     # Beam echograms
                     self.portEchogram.set_data(self.port)
@@ -741,24 +771,24 @@ class draggable_radial:
             self.snapAngle(x)
             
     def snapAngle(self, x):
-            # snap the mouse position to the cente of a beam, update the beam
-            # line and beam number text.
-            idx = (np.abs(self.theta - x)).argmin()
-            snappedAngle = self.theta[idx]
-            self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
+        # snap the mouse position to the cente of a beam, update the beam
+        # line and beam number text.
+        idx = (np.abs(self.theta - x)).argmin()
+        snappedAngle = self.theta[idx]
+        self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
 
-            # update beam number display at the end of the radial line
-            self.text.set_position((snappedAngle, 1.12*self.maxRange))
-            self.text.set_text(f'{idx}')
-            
-            self.c.draw_idle()
+        # update beam number display at the end of the radial line
+        self.text.set_position((snappedAngle, 1.12*self.maxRange))
+        self.text.set_text(f'{idx}')
+        
+        self.c.draw_idle()
 
     def releaseonclick(self, event):
         self.value = self.line.get_xdata()[0]
         
         self.c.mpl_disconnect(self.releaser)
         self.c.mpl_disconnect(self.follower)
-
+        
 if __name__== "__main__":
     main()
 
