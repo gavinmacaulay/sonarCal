@@ -1,24 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Provides omni and echogram displays and sphere plots for use when calibrating 
-omni-directional sonars.
+Provides omni and echogram displays and sphere amplitude plots for use when 
+calibrating omni-directional sonars.
 
-@author: gavinj
+@author: Gavin Macaulay, Institute of Marine Research, Norway
+
 """
 # TODO:
-# Implement Furuno equations to give Sv for display (current is just log10 of power values).
 # Choose beam_group based on beam type rather than requiring it in the config file
-# Make echogram range changable from the UI or a config file
-# Re-enable try/catch in newPing function to be robust with file errors
 # Test and make work on Simrad netcdf files
 
 from pathlib import Path
 
-###############################################################
-# Location of the configuration file. Can include the directory
-configFilename = Path(r'C:\Users\gavin\Dropbox\IMR\sonarCal\src\sonar_calibration.ini')
-
-#############################################################
+# The config file should be in the same directory as this script.
+parent = Path(__file__).resolve().parent
+configFilename = parent.joinpath('sonar_calibration.ini')
 
 import configparser 
 import queue
@@ -59,8 +55,8 @@ def main():
     if not c: # config file not found, so make one
         config['DEFAULT'] = {'numPingsToShow': 100,
                              'maxRange': 50,
-                             'maxSv': 7,
-                             'minSv': 2,
+                             'maxSv': -20,
+                             'minSv': -60,
                              'horizontalBeamGroupPath': 'Sonar/Beam_group1',
                              'watchDir': 'directory where the .nc files are',
                              'liveData': 'yes',
@@ -376,12 +372,12 @@ class echogramPlotter:
         
         # The colormap for the echograms and omni plot
         cmap = copy.copy(mpl.cm.jet) # viridis looks nice too...
-        c#map.set_over('w') # values above self.maxSv show in white, if desired
+        #cmap.set_over('w') # values above self.maxSv show in white, if desired
         cmap.set_under('w') # and for values below self.minSv, if desired
         
         # initialisation value of echogram data
         emptySv = -999.0
-        # the max extend of the threshodl range slider
+        # the max extend of the threshold range slider
         lowestSv = -100
         highestSv = 0
         
