@@ -23,7 +23,7 @@ to select the beam being calibrated and the range bounds of the calibration sphe
 
 ## Configuration
 
-Configuration of the program is done by editing the config file (usually called ``sonar_calibration.ini``). The config parameters are:
+Configuration of the program is done by editing the config file (called ``sonar_calibration.ini`` and located in the same directory as the program). The config parameters are:
 - The directory where the sonar data files are created by the sonar (``watchDir``),
 - The location of log files (``logDir``),
 - The NetCDF4 group name for the horizontal sonar beams (``horizontalBeamGroupPath``),
