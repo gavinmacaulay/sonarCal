@@ -349,7 +349,7 @@ class echogramPlotter:
         
         self.varNum = 5 # number of sphere values to use when calculating the ping-to-ping variability
         
-        self.diffPlotXlim = (-3,3) # [dB]
+        self.diffPlotXlim = (-6,-2) # [dB]
         
         self.numPings = numPings # to show in the echograms
         self.maxRange = maxRange # [m] of the echograms
@@ -614,8 +614,8 @@ class echogramPlotter:
                     self.ampPlotAx.autoscale_view()
                     
                     # Difference in sphere TS from 3 beams
-                    diffPort = self.amp[1,:] - self.amp[0,:]
-                    diffStbd = self.amp[2,:] - self.amp[0,:]
+                    diffPort = self.amp[0,:] - self.amp[1,:]
+                    diffStbd = self.amp[2,:] - self.amp[1,:]
                     self.ampDiffPortPlot.set_ydata(diffPort)
                     self.ampDiffStbdPlot.set_ydata(diffStbd)
                     # and the smoothed
