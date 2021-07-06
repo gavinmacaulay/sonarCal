@@ -11,6 +11,9 @@ import pandas as pd
 import shutil
 import logging
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning) 
+
 # Parent directory to the .nc files. The original files are in a directory called 'original' under this. 
 # Fixed files are placed in a directory called 'fixed' under this (but you'll need to make that directory first)
 dataDir = Path(r'C:\Users\gavin\OneDrive - Havforskningsinstituttet\Projects\sonarCal\example_data\example_survey_data')
@@ -107,18 +110,18 @@ for f in files:
         
         # and set some variable values as per an email from Furuno
         SL = beam_group2['transmit_source_level']
-        SL[:] = 207.3
+        SL[:] = 207.3 # [dB re ...], given by Furuno
+        
         # and read in values for other variables from a csv file.
-        # use pandas...
         c = pd.read_csv(FurunoCorrectionFile)
         c_eba = c.equivalent_beam_angle.to_numpy()
         c_rs = c.receiver_sensitivity.to_numpy()
         c_dz = c.beam_direction_z.to_numpy()
         
         applyCorrections('equivalent_beam_angle', c_eba)
-        applyCorrections('receiver_sensitivity', c_eba)
-        #applyCorrections('beam_direction_z', c_eba)
-        applyCorrections('gain_correction', np.ones(64)*-20.0) # -20 is a guess to look ok in LSSS
+        applyCorrections('receiver_sensitivity', c_rs)
+        #applyCorrections('beam_direction_z', c_dz) # values in the file are better...
+        applyCorrections('gain_correction', np.zeros(64))
         
         trim2DVariable(beam_group2, 'backscatter_r', 'ping_time', 'beam', slice(None), slice(0, 64))
         #trim2DVariable(beam_group2, 'backscatter_i', 'ping_time', 'beam', slice(None), slice(0, 64))
