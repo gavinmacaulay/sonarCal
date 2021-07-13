@@ -14,22 +14,16 @@ parent = Path(__file__).resolve().parent
 configFilename = parent.joinpath('gain_calibration.ini')
 
 import configparser 
-import queue
-from queue import Empty
 import matplotlib as mpl
-#mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import scipy.stats.mstats as ms
-import tkinter.font as tkFont
 
 import numpy as np
 import logging, logging.handlers
-from datetime import datetime, timedelta
+from datetime import datetime
 import os, sys
-import tkinter as tk
 import h5py
 import pandas as pd
-import copy
 import cftime
 
 if sys.platform == "win32":
@@ -90,6 +84,7 @@ def main():
             t = row['start_time'].strftime('%H:%M:%S')
             plt.title(f'Beam {row["beam_number"]} starting at {t}')
             plt.xlim(0, maxRange)
+            plt.grid()
             plt.xlabel('Range [m]')
             plt.ylabel('TS [dB re 1 $m^2$]')
             fig.tight_layout(pad=3.0)
