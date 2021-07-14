@@ -18,7 +18,7 @@ The program has one window:
 
 ![screenshot](screenshot.png "Main (only) window")
 
-The two range rings and radial line on the omni echogram can be moved with the mouse (click/release on an item to start moving it, click/release to stop moving it)
+The two range rings and radial line on the omni echogram can be moved with the mouse (click and drag)
 to select the beam being calibrated and the range bounds of the calibration sphere. Changing these alters what is shown in the other echograms and plots in the window.
 
 ## Configuration
