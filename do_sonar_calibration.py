@@ -516,7 +516,7 @@ class echogramPlotter:
         self.stbdEchogramAx.set_ylabel('Range (m)')
         
         self.ampDiffPlotAx.set_xlabel('Pings')
-        self.ampPlotAx.set_ylabel('TS (dB re 1 $m^2$)')
+        self.ampPlotAx.set_ylabel('Sv (dB re 1 $m^-1$)')
         self.ampDiffPlotAx.set_ylabel(r'$\Delta$ (dB)')
         self.ampPlotAx.set_title('Maximum amplitude at 0 m')
    
