@@ -208,7 +208,7 @@ class sonarReader:
     
         eqn_type = f[beamGroup].attrs['conversion_equation_type'].decode('utf-8')
     
-        # currently only support type 2 Sv calculations (Furuno omnisonars)    
+        # currently only support type 2 TS calculations (Furuno omnisonars)    
         if eqn_type == 'type_2':
             #print(ping, beam)
             # Pick out various variables for the given ping and beam
