@@ -349,7 +349,7 @@ class echogramPlotter:
         
         self.varNum = 5 # number of sphere values to use when calculating the ping-to-ping variability
         
-        self.diffPlotXlim = (-6,-2) # [dB]
+        self.diffPlotXlim = (-3,0) # [dB]
         
         self.numPings = numPings # to show in the echograms
         self.maxRange = maxRange # [m] of the echograms
