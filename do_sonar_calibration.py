@@ -50,7 +50,7 @@ def main():
 
     # Some things we get from an external configuration file
     config = configparser.ConfigParser() 
-    c = config.read(configFilename)
+    c = config.read(configFilename, encoding='utf8')
     
     if not c: # config file not found, so make one
         config['DEFAULT'] = {'numPingsToShow': 100,
