@@ -102,7 +102,7 @@ def main():
     else:
         t = threading.Thread(target=file_replay, args=(watchDir, horizontalBeamGroup))
 
-    t.setDaemon(True) # makes the thread close when main() ends
+    t.daemon = True # makes the thread close when main() ends
     t.start()
 
     # For Windows, catch when the console is closed
@@ -600,7 +600,7 @@ class echogramPlotter:
                     # and measure of ping-to-ping variability
                     variability = np.std(self.amp[1,-self.varNum:-1])
                     if not np.isnan(variability):
-                        self.diffVariability.set_text(f'$\sigma$ = {variability:.1f} dB')
+                        self.diffVariability.set_text(rf'$\sigma$ = {variability:.1f} dB')
                     
                     self.ampSmooth[0,:] = signal.filtfilt(coeff, 1, self.amp[0,:])
                     self.ampSmooth[1,:] = signal.filtfilt(coeff, 1, self.amp[1,:])
@@ -642,7 +642,7 @@ class echogramPlotter:
                             self.polar[:,i] = b[0:self.maxSamples]
                         else:
                             samples = b.shape[0]
-                            self.polar[:,i] = np.concatenate((b, -1.0*np.ones(1, self.maxSamples-samples)), 1)
+                            self.polar[:,i] = np.concatenate((b, -1.0*np.ones(self.maxSamples-samples)), axis=0)
 
                     self.polarPlot.set_array(self.polar.ravel())
                     
@@ -669,7 +669,7 @@ class echogramPlotter:
             data[:,-1] = pingData[0:self.maxSamples]
         else:
             samples = pingData.shape[0]
-            data[:,-1] = np.concatenate((pingData[:], -1.0*np.ones(1,self.maxSamples-samples)), axis=0)
+            data[:,-1] = np.concatenate((pingData[:], -1.0*np.ones(self.maxSamples-samples)), axis=0)
         return data
     
     def updateBeamNum(self, theta):
