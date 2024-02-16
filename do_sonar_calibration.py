@@ -262,9 +262,14 @@ def file_replay(watchDir, beamGroup):
 def SvFromSonarNetCDF4(f, beamGroup, i):
     # Calculate Sv from the given beam group and ping.
     
-    eqn_type = f[beamGroup].attrs['conversion_equation_type'].decode('utf-8')
+    eqn_type = f[beamGroup].attrs['conversion_equation_type']
+    # work around the current Simrad files using integers instead of the 
+    # type defined in the convetion (which shows up here as a string)
+    if isinstance(eqn_type, np.ndarray):
+        eqn_type = f'type_{eqn_type[0]}'
+    else:
+        eqn_type = eqn_type.decode('utf-8')
 
-    # currently only support type 2 Sv calculations (Furuno omnisonars)    
     if eqn_type == 'type_2':
 
         # Pick out various variables for the given ping, i
@@ -302,6 +307,41 @@ def SvFromSonarNetCDF4(f, beamGroup, i):
                 r = samInt * c/2.0 * np.arange(0, sv[j].size) - r_offset # [m] range vector for the current beam
                 sv[j] = 20.0*np.log10(sv[j]/np.sqrt(2.0)) + 20.0*np.log10(r) + 2*alpha[j]*r - a[j] + G_T
 
+    elif eqn_type == 'type_1':
+        # Pick out various variables for the given ping, i
+        p_r = f[beamGroup + '/backscatter_r'][i] # an array for each beam
+        p_i = f[beamGroup + '/backscatter_i'][i] # an array for each beam
+        sv = np.absolute(p_r + 1j*p_i)
+        tau_e = f[beamGroup + '/transmit_duration_equivalent'][i] # a scaler for the current ping
+        Psi = f[beamGroup + '/equivalent_beam_angle'][i] # a scalar for each beam
+        G = f[beamGroup + '/transducer_gain'][i] # a scalar for each beam
+        P = f[beamGroup + '/transmit_power'][i] # a scalar
+        ping_freq_1 = f[beamGroup + '/transmit_frequency_start'][i] # a scalar for each beam
+        ping_freq_2 = f[beamGroup + '/transmit_frequency_stop'][i] # a scalar for each beam
+
+        # and some more constant things that could be moved out of this function...
+        c = f['Environment/sound_speed_indicative'][()] # a scalar
+        alpha_vector = f['Environment/absorption_indicative'][()] # a vector
+        freq_vector = f['Environment/frequency'][()] # a vector
+        ping_freq = (ping_freq_1 + ping_freq_2)/2.0 # a scalar for each beam
+        alpha = np.interp(ping_freq, freq_vector, alpha_vector) # a scalar 
+        wl = c / ping_freq # wavelength [m]
+        
+        if np.any(np.isnan(alpha_vector)):
+            # quick and dirty...
+            alpha = acousticAbsorption(10.0, 35.0, 10.0, ping_freq) 
+    
+        samInt = f[beamGroup + '/sample_interval'][i] # [s]
+        
+        r_offset = 0.0 # incase we need this in the future
+        
+        with np.errstate(divide='ignore', invalid='ignore'): # usually some zeros in the data of no real consequence
+            for k in range(0, sv.shape[0]): # loop over each beam
+                r = samInt * c/2.0 * np.arange(0, sv[k].size) - r_offset # [m] range vector for the current beam
+                sv[k] = 10.0*np.log10(sv[k]) + 20.0*np.log10(r) + 2*alpha*r\
+                      - 10.0*np.log10((P*wl*wl*c*Psi[k]*tau_e) / (32*np.pi*np.pi))\
+                      - G[k]# - 40.0*np.log10(np.cos(gamma))
+        
     else: # unsupported format - just take the log10 of the numbers. Usually usefull.
         sv = f[beamGroup + '/backscatter_r'][i]
         with np.errstate(divide='ignore'):
