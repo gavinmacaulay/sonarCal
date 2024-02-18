@@ -399,6 +399,8 @@ class echogramPlotter:
         self.checkQueueInterval = 200 # [ms] duration between checking the queue for new data
 
         self.movingAveragePoints = 10 # number of points to use in moving average for smoothed plots
+
+        self.emptySv = -999.0 # initialisation value of echogram data
         
         # Make the plots. It gets filled with pretty things once the first ping 
         # of data is received.
@@ -415,8 +417,6 @@ class echogramPlotter:
         #cmap.set_over('w') # values above self.maxSv show in white, if desired
         cmap.set_under('w') # and for values below self.minSv, if desired
         
-        # initialisation value of echogram data
-        emptySv = -999.0
         # the max extend of the threshold range slider
         lowestSv = -100
         highestSv = 0
@@ -426,11 +426,11 @@ class echogramPlotter:
         
         # Storage for the things we plot
         # Polar plot
-        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * emptySv
+        self.polar = np.ones((self.maxSamples, self.numBeams), dtype=float) * self.emptySv
         # Echograms
-        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * emptySv
-        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * emptySv
-        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * emptySv
+        self.port = np.ones((self.maxSamples, self.numPings), dtype=float) * self.emptySv
+        self.main = np.ones((self.maxSamples, self.numPings), dtype=float) * self.emptySv
+        self.stbd = np.ones((self.maxSamples, self.numPings), dtype=float) * self.emptySv
         # Amplitude of sphere
         self.amp = np.ones((3, self.numPings), dtype=float) * np.nan
         self.ampSmooth = np.ones((3, self.numPings), dtype=float) * np.nan
@@ -509,8 +509,8 @@ class echogramPlotter:
         self.stbdEchogram.set_cmap(cmap)
         
         # Omni echogram axes setup
-        self.polarPlotAx.set_theta_offset(np.pi/2)
-        self.polarPlotAx.set_theta_direction(-1)
+        self.polarPlotAx.set_theta_offset(np.pi/2) # radians
+        self.polarPlotAx.set_theta_direction(-1) # -1 == clockwise, 1 == counter clockwise
         self.polarPlotAx.set_frame_on(False)
         self.polarPlotAx.xaxis.set_ticklabels([])
 
@@ -682,7 +682,7 @@ class echogramPlotter:
                             self.polar[:,i] = b[0:self.maxSamples]
                         else:
                             samples = b.shape[0]
-                            self.polar[:,i] = np.concatenate((b, -1.0*np.ones(self.maxSamples-samples)), axis=0)
+                            self.polar[:,i] = np.concatenate((b, self.emptySv*np.ones(self.maxSamples-samples)), axis=0)
 
                     self.polarPlot.set_array(self.polar.ravel())
                     
@@ -709,7 +709,7 @@ class echogramPlotter:
             data[:,-1] = pingData[0:self.maxSamples]
         else:
             samples = pingData.shape[0]
-            data[:,-1] = np.concatenate((pingData[:], -1.0*np.ones(self.maxSamples-samples)), axis=0)
+            data[:,-1] = np.concatenate((pingData[:], self.emptySv*np.ones(self.maxSamples-samples)), axis=0)
         return data
     
     def updateBeamNum(self, theta):
