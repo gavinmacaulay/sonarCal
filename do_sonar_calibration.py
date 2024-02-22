@@ -243,7 +243,12 @@ def file_replay(watchDir, beamGroup):
         # send the data off to be plotted
         queue.put((t[i],samInt,c,sv,theta))
 
-        sleep(1.0)
+        # try to ping at the realtime speed
+        if i > 0:
+            p_now = datetime(1601,1,1) + timedelta(microseconds=t[i]/1000.0)
+            p_prev = datetime(1601,1,1) + timedelta(microseconds=t[i-1]/1000.0)
+            sleep((p_now-p_prev).microseconds/1e6)
+            
     f.close()
     
     logging.info('Finished replaying file: ' + str(mostRecentFile))
