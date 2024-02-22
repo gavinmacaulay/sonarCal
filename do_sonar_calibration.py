@@ -424,7 +424,7 @@ class echogramPlotter:
         
         # the max extend of the threshold range slider
         lowestSv = -100
-        highestSv = 0
+        highestSv = 10
         
         self.maxSamples = int(np.ceil(self.maxRange / (samInt*c/2.0))) # number of samples to store per ping
         self.numBeams = backscatter.shape[0]
