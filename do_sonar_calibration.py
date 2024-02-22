@@ -343,7 +343,7 @@ def SvFromSonarNetCDF4(f, beamGroup, i, tilt):
         with np.errstate(divide='ignore', invalid='ignore'): # usually some zeros in the data of no real consequence
             for k in range(0, sv.shape[0]): # loop over each beam
                 r = samInt * c/2.0 * np.arange(0, sv[k].size) - r_offset # [m] range vector for the current beam
-                sv[k] = 10.0*np.log10(sv[k]) + 20.0*np.log10(r) + 2*alpha*r\
+                sv[k] = 20.0*np.log10(sv[k]) + 20.0*np.log10(r) + 2*alpha*r\
                       - 10.0*np.log10((P*wl*wl*c*Psi[k]*tau_e) / (32*np.pi*np.pi))\
                       - G[k] - 40.0*np.log10(np.cos(tilt[k]))
         
