@@ -14,20 +14,16 @@ parent = Path(__file__).resolve().parent
 configFilename = parent.joinpath('gain_calibration.ini')
 
 import configparser 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import scipy.stats.mstats as ms
 
 import numpy as np
 import logging, logging.handlers
 from datetime import datetime
-import os, sys
+import os
 import h5py
 import pandas as pd
 import cftime
-
-if sys.platform == "win32":
-    import win32api
 
 #root = tk.Tk()
 
@@ -54,25 +50,25 @@ def main():
     calLog = calLog.assign(ts_rms=pd.Series(np.empty(calLog.shape[0])).values)
     calLog = calLog.assign(ts_range=pd.Series(np.empty(calLog.shape[0])).values)
     calLog = calLog.assign(ts_num=pd.Series(np.zeros(calLog.shape[0]), dtype=np.intc).values)
-    calLog = calLog.assign(deltaGnew=pd.Series(np.empty(calLog.shape[0])).values)
-    calLog = calLog.assign(deltaGold=pd.Series(np.empty(calLog.shape[0])).values)
+    calLog = calLog.assign(gain_new=pd.Series(np.empty(calLog.shape[0])).values)
+    calLog = calLog.assign(gain_old=pd.Series(np.empty(calLog.shape[0])).values)
     
     for i, row in calLog.iterrows():
         if i >= 0: # for testing. Lets us select particular rows
-            r, ts, deltaGold = sr.get_beam_TS(row['beam_number'], row['start_time'], row['end_time'])
+            r, ts, gainOld = sr.get_beam_TS(row['beam_number'], row['start_time'], row['end_time'])
             search_r = row['range']
             
             ts_mean, ts_rms, ts_range, ts_num = sr.estimate_TS_at_range((search_r-offset, search_r+offset), r, ts)
 
             # and the new gain correction is....
-            deltaGnew = deltaGold + ts_mean - sphereTS
+            gainNew = gainOld + ts_mean - sphereTS
             
             calLog.iloc[i,calLog.columns.get_loc('ts_mean')] = ts_mean
             calLog.iloc[i,calLog.columns.get_loc('ts_rms')] = ts_rms
             calLog.iloc[i,calLog.columns.get_loc('ts_range')] = ts_range
             calLog.iloc[i,calLog.columns.get_loc('ts_num')] = ts_num
-            calLog.iloc[i,calLog.columns.get_loc('deltaGnew')] = deltaGnew
-            calLog.iloc[i,calLog.columns.get_loc('deltaGold')] = deltaGold
+            calLog.iloc[i,calLog.columns.get_loc('gain_old')] = gainNew
+            calLog.iloc[i,calLog.columns.get_loc('gain_new')] = gainOld
             
             logging.info(f'  Beam {row["beam_number"]} has TS = {ts_mean:.1f} with RMS of {ts_rms:.2f} dB at {ts_range:.1f} m')
     
@@ -185,14 +181,12 @@ class sonarReader:
             
             # Calculate and store the TS for each ping
             for ping_i in within:
-                r, ping, deltaG = self.TSFromSonarNetCDF4(f, self.beamGroup, ping_i, beamNo)
-        
                 # convert x,y,z direction into a horizontal angle for use elsewhere
                 x = f[self.beamGroup + '/beam_direction_x'][ping_i]
                 y = f[self.beamGroup + '/beam_direction_y'][ping_i]
-                theta = np.arctan2(y, x)
-                theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
-                      
+                z = f[self.beamGroup + '/beam_direction_z'][ping_i]
+                tilt = np.arctan(z / np.sqrt(x**2 + y**2)) # [rad]
+                r, ping, gain= self.TSFromSonarNetCDF4(f, self.beamGroup, ping_i, beamNo, tilt)
                 
                 if len(ts) == 0:
                     ts = ping
@@ -201,14 +195,21 @@ class sonarReader:
     
             f.close()
 
-        return r, np.transpose(ts), deltaG # !!!! uses the last r and deltaG's
+        return r, np.transpose(ts), gain # uses the last r and gain's
 
-    def TSFromSonarNetCDF4(self, f, beamGroup, ping, beam):
+    def TSFromSonarNetCDF4(self, f, beamGroup, ping, beam, tilt):
         # Calculate TS from the given beam group, beam, and ping.
     
-        eqn_type = f[beamGroup].attrs['conversion_equation_type'].decode('utf-8')
+        eqn_type = f[beamGroup].attrs['conversion_equation_type']
+        # work around the current Simrad files using integers instead of the 
+        # type defined in the convetion (which shows up here as a string)
+        if isinstance(eqn_type, np.ndarray):
+            eqn_type = f'type_{eqn_type[0]}'
+        else:
+            eqn_type = eqn_type.decode('utf-8')
+            
+        gain = 0 # Return the existing gain via this
     
-        # currently only support type 2 TS calculations (Furuno omnisonars)    
         if eqn_type == 'type_2':
             #print(ping, beam)
             # Pick out various variables for the given ping and beam
@@ -238,11 +239,46 @@ class sonarReader:
         
             a = SL + K + deltaG + G_T #  a scalar 
             samInt = f[beamGroup + '/sample_interval'][ping] # [s]
+            
+            gain = deltaG
     
             with np.errstate(divide='ignore', invalid='ignore'): # usually some zeros in the data of no real consequence
                 r = samInt * c/2.0 * np.arange(0, ts.size) # [m] range vector for the current beam/ping
                 ts = 20.0*np.log10(ts/np.sqrt(2.0)) + 40.0*np.log10(r) + 2*alpha*r - a
-    
+        elif eqn_type == 'type_1':
+            # Pick out various variables for the given ping, i
+            p_r = f[beamGroup + '/backscatter_r'][ping][beam] # an array for each beam/ping
+            p_i = f[beamGroup + '/backscatter_i'][ping][beam] # an array for each beam/ping
+            ts = np.absolute(p_r + 1j*p_i)
+            G = f[beamGroup + '/transducer_gain'][ping][beam] # a scalar for each beam
+            P = f[beamGroup + '/transmit_power'][ping] # a scalar
+            ping_freq_1 = f[beamGroup + '/transmit_frequency_start'][ping] # a scalar for each beam
+            ping_freq_2 = f[beamGroup + '/transmit_frequency_stop'][ping] # a scalar for each beam
+
+            # and some more constant things that could be moved out of this function...
+            c = f['Environment/sound_speed_indicative'][()] # a scalar
+            alpha_vector = f['Environment/absorption_indicative'][()] # a vector
+            freq_vector = f['Environment/frequency'][()] # a vector
+            ping_freq = (ping_freq_1 + ping_freq_2)/2.0 # a scalar for each beam
+            alpha = np.interp(ping_freq, freq_vector, alpha_vector) # a scalar 
+            wl = c / ping_freq # wavelength [m]
+            
+            if np.any(np.isnan(alpha_vector)):
+                # quick and dirty...
+                alpha = self.acousticAbsorption(10.0, 35.0, 10.0, ping_freq) 
+        
+            samInt = f[beamGroup + '/sample_interval'][ping] # [s]
+            
+            r_offset = 0.0 # incase we need this in the future
+            
+            gain = G
+            
+            with np.errstate(divide='ignore', invalid='ignore'): # usually some zeros in the data of no real consequence
+                r = samInt * c/2.0 * np.arange(0, ts.size) - r_offset # [m] range vector for the current beam
+                ts = 20.0*np.log10(ts) + 40.0*np.log10(r) + 2*alpha*r\
+                     - 10.0*np.log10((P*wl*wl) / (16*np.pi*np.pi))\
+                     - G - 40.0*np.log10(np.cos(tilt[beam]))
+            
         else: # unsupported format - just take the log10 of the numbers. Usually usefull.
             ts = f[beamGroup + '/backscatter_r'][ping]
             with np.errstate(divide='ignore'):
@@ -250,7 +286,7 @@ class sonarReader:
                     ts[j] = np.log10(ts[j])
                     r = np.array([]) # Fix this
                     
-        return r, ts, deltaG
+        return r, ts, gain
     
     def acousticAbsorption(temperature, salinity, depth, frequency)               :
         """ simple acoustic absorption calculations for when it's not in the 
