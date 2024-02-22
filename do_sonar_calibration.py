@@ -180,15 +180,8 @@ def file_listen(watchDir, beamGroup):
                         pingTime = datetime(1601,1,1) + timedelta(microseconds=t/1000.0)
                         logging.info('Start reading ping from time {}'.format(pingTime))
                         
-                        sv = SvFromSonarNetCDF4(f, beamGroup, pingIndex)
-                        
-                        x = f[beamGroup + '/beam_direction_x'][pingIndex]
-                        y = f[beamGroup + '/beam_direction_y'][pingIndex]
-                        
-                        # convert x,y,z direction into a horizontal angle for use elsewhere
-                        theta = np.arctan2(y, x)
-                        theta = np.mod(theta, 2*np.pi)
-                        #theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
+                        theta, tilt = beamAnglesFromNetCDF4(f, beamGroup, pingIndex)
+                        sv = SvFromSonarNetCDF4(f, beamGroup, pingIndex, tilt)
                         
                         samInt = f[beamGroup + '/sample_interval'][pingIndex]
                         c = f['Environment/sound_speed_indicative'][()]
@@ -241,14 +234,8 @@ def file_replay(watchDir, beamGroup):
     # Send off each ping at a sedate rate...
     for i in range(0, t.shape[0]):
         #print('ping')
-        sv = SvFromSonarNetCDF4(f, beamGroup, i)
-        x = f[beamGroup + '/beam_direction_x'][i]
-        y = f[beamGroup + '/beam_direction_y'][i]
-        
-        # convert x,y,z direction into a horizontal angle for use elsewhere
-        theta = np.arctan2(y, x)
-        # Make angles go 0 to 2pi, not -pi to 0 to pi (all anti-clockwise)
-        theta = np.mod(theta, 2*np.pi)
+        theta, tilt = beamAnglesFromNetCDF4(f, beamGroup, i)
+        sv = SvFromSonarNetCDF4(f, beamGroup, i, tilt)
                 
         samInt = f[beamGroup + '/sample_interval'][i]
         c = f['Environment/sound_speed_indicative'][()]
@@ -261,7 +248,23 @@ def file_replay(watchDir, beamGroup):
     
     logging.info('Finished replaying file: ' + str(mostRecentFile))
 
-def SvFromSonarNetCDF4(f, beamGroup, i):
+def beamAnglesFromNetCDF4(f, beamGroup, i):
+    # Calculate the beam point angles as per the convention for the given
+    # beamGroup and ping index
+    
+    x = f[beamGroup + '/beam_direction_x'][i]
+    y = f[beamGroup + '/beam_direction_y'][i]
+    z = f[beamGroup + '/beam_direction_z'][i]
+    tilt = np.arctan(z / np.sqrt(x**2 + y**2)) #  [rad]
+    
+    # convert x,y,z direction into a horizontal angle for use elsewhere
+    theta = np.arctan2(y, x)
+    # Make angles go 0 to 2pi, not -pi to 0 to pi (all anti-clockwise)
+    theta = np.mod(theta, 2*np.pi)
+    
+    return theta, tilt
+
+def SvFromSonarNetCDF4(f, beamGroup, i, tilt):
     # Calculate Sv from the given beam group and ping.
     
     eqn_type = f[beamGroup].attrs['conversion_equation_type']
@@ -342,7 +345,7 @@ def SvFromSonarNetCDF4(f, beamGroup, i):
                 r = samInt * c/2.0 * np.arange(0, sv[k].size) - r_offset # [m] range vector for the current beam
                 sv[k] = 10.0*np.log10(sv[k]) + 20.0*np.log10(r) + 2*alpha*r\
                       - 10.0*np.log10((P*wl*wl*c*Psi[k]*tau_e) / (32*np.pi*np.pi))\
-                      - G[k]# - 40.0*np.log10(np.cos(gamma))
+                      - G[k] - 40.0*np.log10(np.cos(tilt[k]))
         
     else: # unsupported format - just take the log10 of the numbers. Usually usefull.
         sv = f[beamGroup + '/backscatter_r'][i]
