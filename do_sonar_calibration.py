@@ -187,7 +187,8 @@ def file_listen(watchDir, beamGroup):
                         
                         # convert x,y,z direction into a horizontal angle for use elsewhere
                         theta = np.arctan2(y, x)
-                        theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
+                        theta = np.mod(theta, 2*np.pi)
+                        #theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
                         
                         samInt = f[beamGroup + '/sample_interval'][pingIndex]
                         c = f['Environment/sound_speed_indicative'][()]
@@ -246,7 +247,8 @@ def file_replay(watchDir, beamGroup):
         
         # convert x,y,z direction into a horizontal angle for use elsewhere
         theta = np.arctan2(y, x)
-        theta[0] = -theta[0] # first beam is usually 180, but it should be -180.
+        # Make angles go 0 to 2pi, not -pi to 0 to pi (all anti-clockwise)
+        theta = np.mod(theta, 2*np.pi)
                 
         samInt = f[beamGroup + '/sample_interval'][i]
         c = f['Environment/sound_speed_indicative'][()]
@@ -509,8 +511,7 @@ class echogramPlotter:
         self.stbdEchogram.set_cmap(cmap)
         
         # Omni echogram axes setup
-        self.polarPlotAx.set_theta_offset(np.pi/2) # radians
-        self.polarPlotAx.set_theta_direction(-1) # -1 == clockwise, 1 == counter clockwise
+        self.polarPlotAx.set_theta_offset(np.pi/2) # to make bow direction plot upwards
         self.polarPlotAx.set_frame_on(False)
         self.polarPlotAx.xaxis.set_ticklabels([])
 
@@ -806,10 +807,11 @@ class draggable_radial:
         # line on a specific beam in the sonar display)
 
         if event.xdata is not None:
-            # Weirdly, the angles that we want to be from -180 to +180 actually go
-            # from -180 to 90 and then -270 to -180. Fix this here (but work in radians).
             x = float(event.xdata)
-            if x < -np.pi:
+            # When the polar plot has an offset (applied setting up the plot), 
+            # the angles in one quadrant become negative (which we don't want).
+            # This fixes that.
+            if x < 0:
                 x += 2*np.pi
             self.snapAngle(x)
             
