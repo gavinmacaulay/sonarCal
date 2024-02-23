@@ -92,7 +92,8 @@ def main():
             # and close it (otherwise there are too many open at once)
             plt.close()
 
-    calLog.to_csv(resultsDir.joinpath('results.csv'), index=False)
+    calLog.to_csv(resultsDir.joinpath('results.csv'), index=False, 
+                  float_format='%.2f', date_format='%Y-%m-%dT%H:%M:%S')
 
 class sonarReader:
     def __init__(self, config):
