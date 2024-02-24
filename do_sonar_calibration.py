@@ -9,6 +9,14 @@ calibrating omni-directional sonars.
 # TODO:
 # Choose beam_group based on beam type rather than requiring it in the config file
 
+# pylint: disable=invalid-name # too late to change all the variable names, etc.
+# pick these ones off later...
+# pylint: disable=too-many-locals
+# pylint: disable=too-many-statements
+# pylint: disable=too-many-branches
+# pylint: disable=too-many-instance-attributes
+# pylint: disable=attribute-defined-outside-init
+
 import configparser
 import queue
 from queue import Empty
@@ -45,7 +53,7 @@ if sys.platform == "win32":
 # queue to communicate between two threads
 queue = queue.Queue()
 root = tk.Tk()
-global job  # handle to the function that does the echogram drawing
+job = None  # handle to the function that does the echogram drawing
 
 
 def main():
@@ -114,7 +122,7 @@ def main():
 
     # Check periodically for new echogram data
     global job
-    job = root.after(echogram.checkQueueInterval, echogram.newPing, root, label)
+    job = root.after(echogram.checkQueueInterval, echogram.newPing, label)
 
     # And start things...
     root.protocol("WM_DELETE_WINDOW", window_closed)
@@ -128,7 +136,6 @@ def on_exit(_sig, _func=None):
 
 def window_closed():
     "Call to nicely end the whole program"
-    global job
     root.after_cancel(job)
     logging.info('Program ending...')
     root.quit()
@@ -615,7 +622,7 @@ class echogramPlotter:
         # Redraw the figure to ensure it updates
         self.fig.canvas.draw_idle()
 
-    def newPing(self, root, label):
+    def newPing(self, label):
         """
         Receives messages from the queue, decodes them and updates the echogram
         """
@@ -746,7 +753,7 @@ class echogramPlotter:
                     logging.warning(e)
                     logging.warning('Ignoring the above and waiting for next ping.')
         global job
-        job = root.after(self.checkQueueInterval, self.newPing, root, label)
+        job = root.after(self.checkQueueInterval, self.newPing, label)
 
     def updateEchogramData(self, data, pingData):
         """
@@ -814,16 +821,19 @@ class draggable_ring:
         self.sid = self.c.mpl_connect('pick_event', self.clickonline)
 
     def clickonline(self, event):
+        """ Capture clicks on lines """
         if event.artist == self.line:
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
             self.releaser = self.c.mpl_connect("button_release_event", self.releaseonclick)
 
     def followmouse(self, event):
+        """ Act on mouse movement """
         if event.ydata is not None:
             self.line.set_ydata(np.ones(self.numPoints)*float(event.ydata))
             self.c.draw_idle()
 
     def releaseonclick(self, _event):
+        """ Stop following events once mouse button is released  """
         self.range = self.line.get_ydata()[0]
 
         self.c.mpl_disconnect(self.releaser)
@@ -857,6 +867,7 @@ class draggable_radial:
         self.sid = self.c.mpl_connect('pick_event', self.clickonline)
 
     def clickonline(self, event):
+        """ Capture clicks on lines """
         if event.artist == self.line:
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
             self.releaser = self.c.mpl_connect("button_release_event", self.releaseonclick)
@@ -893,6 +904,7 @@ class draggable_radial:
         self.c.draw_idle()
 
     def releaseonclick(self, _event):
+        """ Stop following events once mouse button is released  """
         self.value = self.line.get_xdata()[0]
 
         self.c.mpl_disconnect(self.releaser)
