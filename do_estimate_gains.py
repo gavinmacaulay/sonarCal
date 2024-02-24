@@ -5,7 +5,9 @@ Furuno omni-sonars.
 
 @author: Gavin Macaulay, Institute of Marine Research, Norway
 
+
 """
+# pylint: disable=invalid-name # too late to change all the variable names, etc.
 
 from pathlib import Path
 import configparser
