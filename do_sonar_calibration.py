@@ -451,8 +451,7 @@ class echogramPlotter:
        The colormap for the echograms and omni plot
        """
 
-        cmap = copy.copy(mpl.cm.jet)  # viridis looks nice too...
-        # cmap.set_over('w')  # values above self.maxSv show in white, if desired
+        cmap = mpl.colormaps['jet']  # viridis looks nice too...
         cmap.set_under('w')  # and for values below self.minSv, if desired
 
         # the max extend of the threshold range slider
@@ -747,7 +746,7 @@ class echogramPlotter:
                     # until the GUI events slow down...
                     self.fig.canvas.draw()
 
-                except:  # if anything goes wrong, just ignore it...
+                except Exception as e:  # if anything goes wrong, just ignore it...
                     e = sys.exc_info()
                     logging.warning('Error when processing and displaying echo data:')
                     logging.warning(e)
