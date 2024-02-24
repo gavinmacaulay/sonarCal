@@ -8,7 +8,28 @@ calibrating omni-directional sonars.
 """
 # TODO:
 # Choose beam_group based on beam type rather than requiring it in the config file
-# Test and make work on Simrad netcdf files
+
+import configparser 
+import queue
+from queue import Empty
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib import lines
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.widgets import RangeSlider
+from scipy import signal
+import tkinter.font as tkFont
+import threading
+import numpy as np
+import logging
+import logging.handlers
+from datetime import datetime, timedelta
+import os
+import sys
+import tkinter as tk
+from time import sleep
+import h5py
+import copy
 
 from pathlib import Path
 
@@ -16,27 +37,7 @@ from pathlib import Path
 parent = Path(__file__).resolve().parent
 configFilename = parent.joinpath('sonar_calibration.ini')
 
-import configparser 
-import queue
-from queue import Empty
-import matplotlib as mpl
 mpl.use('TkAgg')
-import matplotlib.pyplot as plt
-import matplotlib.lines as lines
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.widgets import RangeSlider
-from scipy import signal
-import tkinter.font as tkFont
-
-import threading
-import numpy as np
-import logging, logging.handlers
-from datetime import datetime, timedelta
-import os, sys
-import tkinter as tk
-from time import sleep
-import h5py
-import copy
 
 if sys.platform == "win32":
     import win32api
@@ -117,7 +118,7 @@ def main():
     root.protocol("WM_DELETE_WINDOW", window_closed)
     root.mainloop()
     
-def on_exit(sig, func=None):
+def on_exit(_sig, _func=None):
     "Call when the Windows cmd console closes"
     window_closed()
     
@@ -129,8 +130,10 @@ def window_closed():
     root.quit()
     
 def file_listen(watchDir, beamGroup):
-    "Find new data in the most recent file (and keep checking for more new data)."
-    "Used for live calibrations."
+    """
+    Find new data in the most recent file (and keep checking for more new data).
+    Used for live calibrations.
+    """
     
     # This function has not been tested to work against a real sonar!!    
     
@@ -254,8 +257,10 @@ def file_replay(watchDir, beamGroup):
     logging.info('Finished replaying file: ' + str(mostRecentFile))
 
 def beamAnglesFromNetCDF4(f, beamGroup, i):
-    # Calculate the beam point angles as per the convention for the given
-    # beamGroup and ping index
+    """
+    Calculate the beam point angles as per the convention for the given
+    beamGroup and ping index
+    """
     
     x = f[beamGroup + '/beam_direction_x'][i]
     y = f[beamGroup + '/beam_direction_y'][i]
@@ -270,7 +275,7 @@ def beamAnglesFromNetCDF4(f, beamGroup, i):
     return theta, tilt
 
 def SvFromSonarNetCDF4(f, beamGroup, i, tilt):
-    # Calculate Sv from the given beam group and ping.
+    """ Calculate Sv from the given beam group and ping. """
     
     eqn_type = f[beamGroup].attrs['conversion_equation_type']
     # work around the current Simrad files using integers instead of the 
@@ -386,7 +391,7 @@ def acousticAbsorption(temperature, salinity, depth, frequency)               :
     return alpha
 
 class echogramPlotter:
-    "Receive via a queue new ping data and use that to update the display"
+    """ Receive via a queue new ping data and use that to update the display """
     
     def __init__(self, numPings, maxRange, maxSv, minSv):
         # Various user-changable lines on the plots that could in the future 
@@ -497,7 +502,7 @@ class echogramPlotter:
         self.ampPlotAx.set_xlim(0, self.numPings)
         # a informative number on the TS plot
         self.diffVariability = self.ampPlotAx.text(0.05, 0.95, '', ha='left', va='top', transform=self.ampPlotAx.transAxes)
-        self.diffVariability.set_bbox(dict(color='w', alpha=0.5))
+        self.diffVariability.set_bbox({'color':'w', 'alpha':0.5})
         
         # Difference in sphere TS from the 3 beams
         self.ampDiffPortPlot, = self.ampDiffPlotAx.plot(self.ampDiffPort, 'r-', linewidth=1)
@@ -587,8 +592,7 @@ class echogramPlotter:
             try:
                 message = queue.get(block=False)
             except Empty:
-                    logging.info('No new data in received message.')
-                    pass
+                logging.info('No new data in received message.')
             else:
                 try:
                     (t, samInt, c, backscatter, theta) = message
@@ -706,7 +710,6 @@ class echogramPlotter:
                     logging.warning('Error when processing and displaying echo data:')
                     logging.warning(e)  
                     logging.warning('Ignoring the above and waiting for next ping.')
-                    pass
         global job
         job = root.after(self.checkQueueInterval, self.newPing, root, label)
             
@@ -752,10 +755,10 @@ def setupLogging(log_dir, label):
 
 class draggable_ring:
     "Provides a range ring on a polar plot that the user can move with the mouse."
-    def __init__(self, ax, range):
+    def __init__(self, ax, r):
         self.ax = ax
         self.c = ax.get_figure().canvas
-        self.range = range
+        self.range = r
         self.numPoints = 50 # used to draw the range circle
 
         self.line = lines.Line2D(np.linspace(-np.pi,np.pi, num=self.numPoints), 
@@ -776,7 +779,7 @@ class draggable_ring:
             self.line.set_ydata(np.ones(self.numPoints)*float(event.ydata))
             self.c.draw_idle()
 
-    def releaseonclick(self, event):
+    def releaseonclick(self, _event):
         self.range = self.line.get_ydata()[0]
 
         self.c.mpl_disconnect(self.releaser)
@@ -797,7 +800,7 @@ class draggable_radial:
                                  linewidth=1, color='k', picker=True)
         self.text = self.ax.text(self.angle, 1.12*self.maxRange, '', \
                     horizontalalignment = 'center', verticalalignment = 'center')
-        self.text.set_bbox(dict(color='w', alpha=0.5, boxstyle='round, rounding_size=0.6'))
+        self.text.set_bbox({'color':'w', 'alpha':0.5, 'boxstyle':'round,rounding_size=0.6'})
         self.snapAngle(self.angle)
 
         self.line.set_pickradius(5)
@@ -836,7 +839,7 @@ class draggable_radial:
         
         self.c.draw_idle()
 
-    def releaseonclick(self, event):
+    def releaseonclick(self, _event):
         self.value = self.line.get_xdata()[0]
         
         self.c.mpl_disconnect(self.releaser)
