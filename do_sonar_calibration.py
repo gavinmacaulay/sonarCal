@@ -29,7 +29,6 @@ from datetime import datetime, timedelta
 import os
 import sys
 from time import sleep
-import copy
 from pathlib import Path
 
 import h5py
@@ -147,8 +146,6 @@ def file_listen(watchDir, beamGroup):
     Used for live calibrations.
     """
 
-    # This function has not been tested to work against a real sonar!!
-
     # A more elegant method for all of this can be found in the examples here:
     # https://docs.h5py.org/en/stable/swmr.html, which uses the watch facility
     # in the hdf5 library (but we're not sure if the omnisonars write data in
@@ -261,9 +258,8 @@ def file_replay(watchDir, beamGroup):
 
         # try to ping at the realtime speed
         if i > 0:
-            p_now = datetime(1601, 1, 1) + timedelta(microseconds=t[i]/1000.0)
-            p_prev = datetime(1601, 1, 1) + timedelta(microseconds=t[i-1]/1000.0)
-            sleep((p_now-p_prev).microseconds/1e6)
+            # t has units of nanoseconds
+            sleep((t[i] - t[i-1])/1e9)
 
     f.close()
 
