@@ -14,6 +14,7 @@ All of the programs can be run from the command line (e.g., Anaconda Prompt if u
 - netCDF4 
 - pandas
 - cftime
+- humanize
 
 # sonarCal
 This program assists with the standard sphere calibration of omni-directional fisheries sonars. It provides a real-time display of sonar data that helps with moving a calibration sphere into the centre of a sonar beam.
