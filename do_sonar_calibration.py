@@ -278,7 +278,7 @@ def beamAnglesFromNetCDF4(f, beamGroup, i):
     tilt = np.arctan(z / np.sqrt(x**2 + y**2))  # [rad]
 
     # convert x,y,z direction into a horizontal angle for use elsewhere
-    theta = np.arctan2(y, x)
+    theta = np.arctan2(-y, x)
     # Make angles go 0 to 2pi, not -pi to 0 to pi (all anti-clockwise)
     theta = np.mod(theta, 2*np.pi)
 
@@ -638,8 +638,10 @@ class echogramPlotter:
                     # Update the plots with the data in the new ping
                     pingTime = datetime(1601, 1, 1) + timedelta(microseconds=t/1000.0)
                     timeBehind = datetime.utcnow() - pingTime
-                    label.config(text=f'Ping at {pingTime} ({timeBehind.total_seconds():.1f}'
-                                 ' seconds ago)')
+                    milliseconds = pingTime.microsecond / 1000
+                    label.config(text=f'Ping at {pingTime:%Y-%m-%d %H:%M:%S}.' +
+                                 f'{milliseconds:03.0f} '
+                                 f'({timeBehind.total_seconds():.1f} seconds ago)')
                     logging.info('Displaying ping that occurred at %s.', pingTime)
 
                     self.minTargetRange = min(self.rangeRing1.range, self.rangeRing2.range)
