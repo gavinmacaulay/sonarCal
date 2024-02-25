@@ -39,6 +39,7 @@ import matplotlib.pyplot as plt
 from matplotlib import lines
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.widgets import RangeSlider
+import humanize
 
 # The config file should be in the same directory as this script.
 parent = Path(__file__).resolve().parent
@@ -641,7 +642,7 @@ class echogramPlotter:
                     milliseconds = pingTime.microsecond / 1000
                     label.config(text=f'Ping at {pingTime:%Y-%m-%d %H:%M:%S}.' +
                                  f'{milliseconds:03.0f} '
-                                 f'({timeBehind.total_seconds():.1f} seconds ago)')
+                                 f'({humanize.precisedelta(timeBehind)} ago)')
                     logging.info('Displaying ping that occurred at %s.', pingTime)
 
                     self.minTargetRange = min(self.rangeRing1.range, self.rangeRing2.range)
