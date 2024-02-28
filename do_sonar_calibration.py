@@ -198,13 +198,14 @@ def file_listen(watchDir, beamGroup):
 
                         samInt = f[beamGroup + '/sample_interval'][pingIndex]
                         c = f['Environment/sound_speed_indicative'][()]
+                        labels = f[beamGroup + '/beam']
 
                         t_previous = t
                         noNewDataCount = 0  # reset the count
 
                         logging.info('Finished reading ping from time %s', pingTime)
                         # send the data off to be plotted
-                        queue.put((t, samInt, c, sv, theta))
+                        queue.put((t, samInt, c, sv, theta, labels))
                     else:
                         noNewDataCount += 1
                         if noNewDataCount > maxNoNewDataCount:
@@ -253,9 +254,10 @@ def file_replay(watchDir, beamGroup):
 
         samInt = f[beamGroup + '/sample_interval'][i]
         c = f['Environment/sound_speed_indicative'][()]
+        labels = f[beamGroup + '/beam']
 
         # send the data off to be plotted
-        queue.put((t[i], samInt, c, sv, theta))
+        queue.put((t[i], samInt, c, sv, theta, labels))
 
         # try to ping at the realtime speed
         if i > 0:
@@ -443,7 +445,7 @@ class echogramPlotter:
 
         self.firstPing = True
 
-    def createGUI(self, samInt, c, backscatter, theta):
+    def createGUI(self, samInt, c, backscatter, theta, labels):
         """
        The colormap for the echograms and omni plot
        """
@@ -584,7 +586,8 @@ class echogramPlotter:
         # Range rings on the omni echogram
         self.rangeRing1 = draggable_ring(self.polarPlotAx, self.minTargetRange)
         self.rangeRing2 = draggable_ring(self.polarPlotAx, self.maxTargetRange)
-        self.beamLine = draggable_radial(self.polarPlotAx, self.beamLineAngle, self.maxRange, theta)
+        self.beamLine = draggable_radial(self.polarPlotAx, self.beamLineAngle,
+                                         self.maxRange, theta, labels)
 
         self.updateBeamNum(theta)  # sets self.beam from the positon of the radial line
 
@@ -630,11 +633,11 @@ class echogramPlotter:
                 logging.info('No new data in received message.')
             else:
                 try:
-                    (t, samInt, c, backscatter, theta) = message
+                    (t, samInt, c, backscatter, theta, labels) = message
 
                     if self.firstPing:
                         self.firstPing = False
-                        self.createGUI(samInt, c, backscatter, theta)
+                        self.createGUI(samInt, c, backscatter, theta, labels)
 
                     # Update the plots with the data in the new ping
                     pingTime = datetime(1601, 1, 1) + timedelta(microseconds=t/1000.0)
@@ -843,11 +846,12 @@ class draggable_radial:
     Provides a radial line on a polar plot that the user can move with the mouse.
     """
 
-    def __init__(self, ax, angle, maxRange, theta):
+    def __init__(self, ax, angle, maxRange, theta, labels):
         self.ax = ax
         self.c = ax.get_figure().canvas
         self.angle = angle
         self.maxRange = maxRange
+        self.labels = labels
         self.theta = theta  # the sonar-provided beam pointing angles.
 
         self.value = 0.0  # is updated to a true value once data is received
@@ -897,7 +901,7 @@ class draggable_radial:
 
         # update beam number display at the end of the radial line
         self.text.set_position((snappedAngle, 1.12*self.maxRange))
-        self.text.set_text(f'{idx}')
+        self.text.set_text(f'{self.labels[idx].decode()}')
 
         self.c.draw_idle()
 
