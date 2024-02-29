@@ -711,9 +711,9 @@ class echogramPlotter:
                     self.mainEchogram.set_data(self.main)
                     self.stbdEchogram.set_data(self.stbd)
 
-                    self.portEchogramAx.set_title(f'Beam {beamPort} (port)', loc='left')
-                    self.mainEchogramAx.set_title(f'Beam {self.beam}', loc='left')
-                    self.stbdEchogramAx.set_title(f'Beam {beamStbd} (starboard)', loc='left')
+                    self.portEchogramAx.set_title(f'Beam {labels[beamPort].decode()}', loc='left')
+                    self.mainEchogramAx.set_title(f'Beam {labels[self.beam].decode()}', loc='left')
+                    self.stbdEchogramAx.set_title(f'Beam {labels[beamStbd].decode()}', loc='left')
 
                     # Polar plot
                     for i, b in enumerate(backscatter):
