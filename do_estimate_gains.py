@@ -10,7 +10,7 @@ import configparser
 import logging
 import logging.handlers
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import matplotlib.pyplot as plt
 import scipy.stats.mstats as ms
 import numpy as np
@@ -331,7 +331,7 @@ class sonarReader:
 
 def setupLogging(log_dir, label):
     """Set info, warning, and error message logger to a file and to the console."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     logger_filename = os.path.join(log_dir, now.strftime('log_' + label + '-%Y%m%d-T%H%M%S.log'))
     logger = logging.getLogger('')
 

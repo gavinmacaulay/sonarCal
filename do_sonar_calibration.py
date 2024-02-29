@@ -26,7 +26,7 @@ import tkinter.font as tkFont
 import threading
 import logging
 import logging.handlers
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import sys
 from time import sleep
@@ -625,8 +625,9 @@ class echogramPlotter:
                         self.createGUI(samInt, c, backscatter, theta, labels)
 
                     # Update the plots with the data in the new ping
-                    pingTime = datetime(1601, 1, 1) + timedelta(microseconds=t/1000.0)
-                    timeBehind = datetime.utcnow() - pingTime
+                    pingTime = datetime(1601, 1, 1, tzinfo=timezone.utc)\
+                        + timedelta(microseconds=t/1000.0)
+                    timeBehind = datetime.now(timezone.utc) - pingTime
                     milliseconds = pingTime.microsecond / 1000
                     label.config(text=f'Ping at {pingTime:%Y-%m-%d %H:%M:%S}.' +
                                  f'{milliseconds:03.0f} '
@@ -762,7 +763,7 @@ class echogramPlotter:
 
 def setupLogging(log_dir, label):
     """Set info, warning, and error message logger to a file and to the console."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     logger_filename = os.path.join(log_dir, now.strftime('log_' + label + '-%Y%m%d-T%H%M%S.log'))
     logger = logging.getLogger('')
     logger.setLevel(logging.INFO)
