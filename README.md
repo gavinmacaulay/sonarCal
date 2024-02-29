@@ -39,12 +39,12 @@ Configuration of the program is done by editing the config file (called ``sonar_
 
 # Estimate gains
 
-This program calculates beam gain values from existing .nc files. It expects to be given a beam calibration file that lists start and stop times for when the calibration sphere is centered in particular beams, as well as the approximate range to the sphere. This file should be a csv-formatted file with column headers in the first row of ``start_time``, ``end_time``, ``beam_number``, and ``range``. The times should be in a format that the Python Pandas module can read. The range has units of metres. An example of such a file is:
+This program calculates beam gain values from existing .nc files. It expects to be given a beam calibration file that lists start and stop times for when the calibration sphere is centered in particular beams, as well as the approximate range to the sphere. This file should be a csv-formatted file with column headers in the first row of ``start_time``, ``end_time``, ``beam_name``, and ``range``. The times should be in a format that the Python Pandas module can read. The range has units of metres. An example of such a file is:
 
 ```
-start_time,end_time,beam_number,range
-2021-06-08T8:07:50,2021-06-08T8:12:50,40,9
-2021-06-08T8:18:40,2021-06-08T8:22:00,39,9
+start_time,end_time,beam_name,range
+2021-06-08T8:07:50,2021-06-08T8:12:50,Horizontal-H40,9 # Using a Simrad beam name
+2021-06-08T8:18:40,2021-06-08T8:22:00,39,9 # Using a Furuno beam name
 ```
 
 The program is configured by editing the config file (``gain_calibration.ini``, located in the same directory as the program). The parameters are:
