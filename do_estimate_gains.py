@@ -41,7 +41,7 @@ def main():
     sr = sonarReader(config)
 
     calLog = pd.read_csv(calLogFile, parse_dates=['start_time', 'end_time'],
-                         dtype={'beam_name': str})
+                         dtype={'beam_name': str}, comment='#')
 
     calLog = calLog.assign(ts_mean=pd.Series(np.empty(calLog.shape[0])).values)
     calLog = calLog.assign(ts_rms=pd.Series(np.empty(calLog.shape[0])).values)
