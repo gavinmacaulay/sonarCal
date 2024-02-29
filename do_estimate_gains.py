@@ -40,7 +40,8 @@ def main():
 
     sr = sonarReader(config)
 
-    calLog = pd.read_csv(calLogFile, parse_dates=['start_time', 'end_time'])
+    calLog = pd.read_csv(calLogFile, parse_dates=['start_time', 'end_time'],
+                         dtype={'beam_name': str})
 
     calLog = calLog.assign(ts_mean=pd.Series(np.empty(calLog.shape[0])).values)
     calLog = calLog.assign(ts_rms=pd.Series(np.empty(calLog.shape[0])).values)
@@ -51,8 +52,11 @@ def main():
 
     for i, row in calLog.iterrows():
         if i >= 0:  # for testing. Lets us select particular rows
-            r, ts, gainOld = sr.get_beam_TS(row['beam_number'], row['start_time'], row['end_time'])
+            r, ts, gainOld = sr.get_beam_TS(row['beam_name'], row['start_time'], row['end_time'])
             search_r = row['range']
+
+            if r is None:
+                continue
 
             ts_mean, ts_rms, ts_range, ts_num = sr.estimate_TS_at_range((search_r-offset,
                                                                          search_r+offset), r, ts)
@@ -67,8 +71,8 @@ def main():
             calLog.iloc[i, calLog.columns.get_loc('gain_old')] = gainNew
             calLog.iloc[i, calLog.columns.get_loc('gain_new')] = gainOld
 
-            logging.info('  Beam %d has TS = %.1f with RMS of %.2f dB at %.1f m',
-                         row["beam_number"], ts_mean, ts_rms, ts_range)
+            logging.info('  Beam %s has TS = %.1f with RMS of %.2f dB at %.1f m',
+                         row["beam_name"], ts_mean, ts_rms, ts_range)
 
             fig, _ = plt.subplots()
             plt.plot(r, ts, linewidth=0.5)
@@ -76,7 +80,7 @@ def main():
             plt.plot([search_r+offset, search_r+offset], [-140, -20], 'k')
             plt.text(0.75*maxRange, -23, f'TS = {ts_mean:.1f} dB')
             t = row['start_time'].strftime('%H:%M:%S')
-            plt.title(f'Beam {row["beam_number"]} starting at {t}')
+            plt.title(f'Beam {row["beam_name"]} starting at {t}')
             plt.xlim(0, maxRange)
             plt.grid()
             plt.xlabel('Range [m]')
@@ -85,7 +89,7 @@ def main():
 
             # Save figure to an image
             t = row['start_time'].strftime('%H%M%S')
-            fig.savefig(resultsDir.joinpath(f'Beam_{row["beam_number"]}_{t}.png'))
+            fig.savefig(resultsDir.joinpath(f'Beam_{row["beam_name"]}_{t}.png'))
 
             # and close it (otherwise there are too many open at once)
             plt.close()
@@ -150,9 +154,9 @@ class sonarReader:
 
         return ts_mean, ts_rms, ts_range, ts_num
 
-    def get_beam_TS(self, beamNo, startTime, endTime):
+    def get_beam_TS(self, beamName, startTime, endTime):
         """Load the requested beam between the requested times."""
-        logging.info('Processing beam %d from %s to %s', beamNo, startTime, endTime)
+        logging.info('Processing beam "%s" from %s to %s', beamName, startTime, endTime)
 
         # Which files contain data between the start and end times?
         first_file_i = np.nonzero((startTime >= self.file_start_times)
@@ -177,6 +181,13 @@ class sonarReader:
 
             t = f[self.beamGroup + '/ping_time']
             tt = cftime.num2pydate(t[:]/1e6, 'milliseconds since 1601-01-01 00:00:00')
+            beamIds = f[self.beamGroup + '/beam']
+            beamIds = (b.decode() for b in beamIds)
+            # Find index of beam named beamName
+            beam = next((i for (i, name) in enumerate(beamIds) if name == beamName), None)
+            if beam is None:
+                logging.error(' No beam found with name: "%s"', beamName)
+                return (None, None, None)
 
             # find the pings within the time period
             within = np.nonzero((tt >= startTime) & (tt <= endTime))[0]
@@ -188,7 +199,7 @@ class sonarReader:
                 y = f[self.beamGroup + '/beam_direction_y'][ping_i]
                 z = f[self.beamGroup + '/beam_direction_z'][ping_i]
                 tilt = np.arctan(z / np.sqrt(x**2 + y**2))  # [rad]
-                r, ping, gain = self.TSFromSonarNetCDF4(f, self.beamGroup, ping_i, beamNo, tilt)
+                r, ping, gain = self.TSFromSonarNetCDF4(f, self.beamGroup, ping_i, beam, tilt)
 
                 if len(ts) == 0:
                     ts = ping
