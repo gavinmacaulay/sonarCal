@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
 """
-Estimate calibration gains from sphere calibration data collected using
-Furuno omni-sonars.
+Estimate calibration gains from sphere calibration data collected using Furuno omni-sonars.
 
 @author: Gavin Macaulay, Institute of Marine Research, Norway
-
-
 """
 # pylint: disable=invalid-name # too late to change all the variable names, etc.
 
@@ -28,10 +24,7 @@ configFilename = parent.joinpath('gain_calibration.ini')
 
 
 def main():
-    """
-    Calculates the calibrated gain for each beam in the given beam file.
-    """
-
+    """Calculate the calibrated gain for each beam in the given beam file."""
     config = configparser.ConfigParser()
     config.read(configFilename, encoding='utf8')
 
@@ -102,9 +95,7 @@ def main():
 
 
 class sonarReader:
-    """
-    Reads omnisonar data files that are in the sonar-netCDF4 format
-    """
+    """Read omnisonar data files that are in the sonar-netCDF4 format."""
 
     def __init__(self, config):
 
@@ -136,9 +127,7 @@ class sonarReader:
         self.filenames = np.array(self.filenames)
 
     def estimate_TS_at_range(self, range_bounds, r, ts):
-        """Given an range bounds, calculate the mean TS from the strongest echoes
-        in that range over all given pings"""
-
+        """Calculate the mean TS from the strongest echoes in range_bound over all given pings."""
         logging.info('  Searching for maximum response between %.1f and %.1f m',
                      range_bounds[0], range_bounds[1])
         mask = (r >= range_bounds[0]) & (r <= range_bounds[1])
@@ -162,8 +151,7 @@ class sonarReader:
         return ts_mean, ts_rms, ts_range, ts_num
 
     def get_beam_TS(self, beamNo, startTime, endTime):
-        """Load the requested beam between the requested times"""
-
+        """Load the requested beam between the requested times."""
         logging.info('Processing beam %d from %s to %s', beamNo, startTime, endTime)
 
         # Which files contain data between the start and end times?
@@ -212,10 +200,7 @@ class sonarReader:
         return r, np.transpose(ts), gain  # uses the last r and gain's
 
     def TSFromSonarNetCDF4(self, f, beamGroup, ping, beam, tilt):
-        """
-        Calculates TS from the given beam group, beam, and ping.
-        """
-
+        """Calculate TS from the given beam group, beam, and ping."""
         eqn_type = f[beamGroup].attrs['conversion_equation_type']
         # work around the current Simrad files using integers instead of the
         # type defined in the convetion (which shows up here as a string)
@@ -308,14 +293,15 @@ class sonarReader:
         return r, ts, gain
 
     def acousticAbsorption(self, temperature, salinity, depth, frequency):
-        """ simple acoustic absorption calculations for when it's not in the
-            sonar files. Uses Ainslie & McColm, 1998.
-            Units are:
-                temperature - degC
-                salinity - PSU
-                depth - m
-                frequency - Hz
-                alpha - dB/m
+        """Calculate acoustic absorption.
+
+        Uses Ainslie & McColm, 1998.
+        Units are:
+            temperature - degC
+            salinity - PSU
+            depth - m
+            frequency - Hz
+            alpha - dB/m
         """
         frequency = frequency / 1e3  # [kHz]
         pH = 8.0
@@ -333,10 +319,7 @@ class sonarReader:
 
 
 def setupLogging(log_dir, label):
-    """
-    Setup info, warning, and error message logger to a file and to the console
-    """
-
+    """Set info, warning, and error message logger to a file and to the console."""
     now = datetime.utcnow()
     logger_filename = os.path.join(log_dir, now.strftime('log_' + label + '-%Y%m%d-T%H%M%S.log'))
     logger = logging.getLogger('')
