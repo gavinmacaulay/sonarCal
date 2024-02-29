@@ -1,5 +1,6 @@
-# -*- coding: utf-8 -*-
 """
+Omnisonar calibration data collection UI.
+
 Provides omni and echogram displays and sphere amplitude plots for use when
 calibrating omni-directional sonars.
 
@@ -57,9 +58,7 @@ job = None  # handle to the function that does the echogram drawing
 
 
 def main():
-    """
-    Some things we get from an external configuration file
-    """
+    """Omnisonar calibration user interface."""
     config = configparser.ConfigParser()
     c = config.read(configFilename, encoding='utf8')
 
@@ -130,23 +129,23 @@ def main():
 
 
 def on_exit(_sig, _func=None):
-    "Call when the Windows cmd console closes"
+    """Call when the Windows cmd console closes."""
     window_closed()
 
 
 def window_closed():
-    "Call to nicely end the whole program"
+    """Call to nicely end the whole program."""
     root.after_cancel(job)
     logging.info('Program ending...')
     root.quit()
 
 
 def file_listen(watchDir, beamGroup):
-    """
+    """Listen for new data in a file.
+
     Find new data in the most recent file (and keep checking for more new data).
     Used for live calibrations.
     """
-
     # A more elegant method for all of this can be found in the examples here:
     # https://docs.h5py.org/en/stable/swmr.html, which uses the watch facility
     # in the hdf5 library (but we're not sure if the omnisonars write data in
@@ -226,8 +225,7 @@ def file_listen(watchDir, beamGroup):
 
 
 def file_replay(watchDir, beamGroup):
-    "Replay all data in the newest file. Used for testing."
-
+    """Replay all data in the newest file. Used for testing."""
     waitIntervalFile = 1.0  # [s] time period between checking for new files
 
     # Find the most recent file in the directory
@@ -270,11 +268,7 @@ def file_replay(watchDir, beamGroup):
 
 
 def beamAnglesFromNetCDF4(f, beamGroup, i):
-    """
-    Calculate the beam point angles as per the convention for the given
-    beamGroup and ping index
-    """
-
+    """Calculate the beam angles as per the convention for the given beamGroup and ping index."""
     x = f[beamGroup + '/beam_direction_x'][i]
     y = f[beamGroup + '/beam_direction_y'][i]
     z = f[beamGroup + '/beam_direction_z'][i]
@@ -289,8 +283,7 @@ def beamAnglesFromNetCDF4(f, beamGroup, i):
 
 
 def SvFromSonarNetCDF4(f, beamGroup, i, tilt):
-    """ Calculate Sv from the given beam group and ping. """
-
+    """Calculate Sv from the given beam group and ping."""
     eqn_type = f[beamGroup].attrs['conversion_equation_type']
     # work around the current Simrad files using integers instead of the
     # type defined in the convetion (which shows up here as a string)
@@ -386,14 +379,15 @@ def SvFromSonarNetCDF4(f, beamGroup, i, tilt):
 
 
 def acousticAbsorption(temperature, salinity, depth, frequency):
-    """ simple acoustic absorption calculations for when it's not in the
-        sonar files. Uses Ainslie & McColm, 1998.
-        Units are:
-            temperature - degC
-            salinity - PSU
-            depth - m
-            frequency - Hz
-            alpha - dB/m
+    """Calculate acoustic absorption.
+
+    Uses Ainslie & McColm, 1998.
+    Units are:
+        temperature - degC
+        salinity - PSU
+        depth - m
+        frequency - Hz
+        alpha - dB/m
     """
     frequency = frequency / 1e3  # [kHz]
     pH = 8.0
@@ -411,7 +405,7 @@ def acousticAbsorption(temperature, salinity, depth, frequency):
 
 
 class echogramPlotter:
-    """ Receive via a queue new ping data and use that to update the display """
+    """Receive via a queue new ping data and use that to update the display."""
 
     def __init__(self, numPings, maxRange, maxSv, minSv):
         # Various user-changable lines on the plots that could in the future
@@ -446,10 +440,7 @@ class echogramPlotter:
         self.firstPing = True
 
     def createGUI(self, samInt, c, backscatter, theta, labels):
-        """
-       The colormap for the echograms and omni plot
-       """
-
+        """Create the GUI."""
         cmap = mpl.colormaps['jet']  # viridis looks nice too...
         cmap.set_under('w')  # and for values below self.minSv, if desired
 
@@ -609,10 +600,7 @@ class echogramPlotter:
         self.ampPlotAx.set_title('Maximum amplitude at 0 m')
 
     def updateEchogramThresholds(self, val):
-        """
-        Update the image colormaps
-        """
-
+        """Update the image colormaps."""
         self.polarPlot.set_clim(val)
         self.portEchogram.set_clim(val)
         self.mainEchogram.set_clim(val)
@@ -622,10 +610,7 @@ class echogramPlotter:
         self.fig.canvas.draw_idle()
 
     def newPing(self, label):
-        """
-        Receives messages from the queue, decodes them and updates the echogram
-        """
-
+        """Receive messages from the queue, decodes them and updates the echogram."""
         while not queue.empty():
             try:
                 message = queue.get(block=False)
@@ -757,10 +742,7 @@ class echogramPlotter:
         job = root.after(self.checkQueueInterval, self.newPing, label)
 
     def updateEchogramData(self, data, pingData):
-        """
-        For the beam echograms, shift the ping data to the left and add in the new ping data
-        """
-
+        """Shift the ping data to the left and add in the new ping data."""
         data = np.roll(data, -1, 1)
         if pingData.shape[0] > self.maxSamples:
             data[:, -1] = pingData[0:self.maxSamples]
@@ -771,8 +753,7 @@ class echogramPlotter:
         return data
 
     def updateBeamNum(self, theta):
-        """ Gets the beam number from the beam line angle and the latest theta """
-
+        """Get the beam number from the beam line angle and the latest theta."""
         self.beamLineAngle = self.beamLine.value
 
         idx = (np.abs(theta - self.beamLineAngle)).argmin()
@@ -780,7 +761,7 @@ class echogramPlotter:
 
 
 def setupLogging(log_dir, label):
-    """ Setup info, warning, and error message logger to a file and to the console """
+    """Set info, warning, and error message logger to a file and to the console."""
     now = datetime.utcnow()
     logger_filename = os.path.join(log_dir, now.strftime('log_' + label + '-%Y%m%d-T%H%M%S.log'))
     logger = logging.getLogger('')
@@ -803,9 +784,7 @@ def setupLogging(log_dir, label):
 
 
 class draggable_ring:
-    """
-    Provides a range ring on a polar plot that the user can move with the mouse.
-    """
+    """Provides a range ring on a polar plot that the user can move with the mouse."""
 
     def __init__(self, ax, r):
         self.ax = ax
@@ -822,19 +801,19 @@ class draggable_ring:
         self.sid = self.c.mpl_connect('pick_event', self.clickonline)
 
     def clickonline(self, event):
-        """ Capture clicks on lines """
+        """Capture clicks on lines."""
         if event.artist == self.line:
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
             self.releaser = self.c.mpl_connect("button_release_event", self.releaseonclick)
 
     def followmouse(self, event):
-        """ Act on mouse movement """
+        """Act on mouse movement."""
         if event.ydata is not None:
             self.line.set_ydata(np.ones(self.numPoints)*float(event.ydata))
             self.c.draw_idle()
 
     def releaseonclick(self, _event):
-        """ Stop following events once mouse button is released  """
+        """Stop following events once mouse button is released."""
         self.range = self.line.get_ydata()[0]
 
         self.c.mpl_disconnect(self.releaser)
@@ -842,9 +821,7 @@ class draggable_ring:
 
 
 class draggable_radial:
-    """
-    Provides a radial line on a polar plot that the user can move with the mouse.
-    """
+    """Provide a radial line on a polar plot that the user can move with the mouse."""
 
     def __init__(self, ax, angle, maxRange, theta, labels):
         self.ax = ax
@@ -869,17 +846,17 @@ class draggable_radial:
         self.sid = self.c.mpl_connect('pick_event', self.clickonline)
 
     def clickonline(self, event):
-        """ Capture clicks on lines """
+        """Capture clicks on lines."""
         if event.artist == self.line:
             self.follower = self.c.mpl_connect("motion_notify_event", self.followmouse)
             self.releaser = self.c.mpl_connect("button_release_event", self.releaseonclick)
 
     def followmouse(self, event):
-        """
-        snap the beam line to beam centres (make it easier to get the beam
+        """Beam line follower.
+
+        Snap the beam line to beam centres (make it easier to get the beam
         line on a specific beam in the sonar display)
         """
-
         if event.xdata is not None:
             x = float(event.xdata)
             # When the polar plot has an offset (applied setting up the plot),
@@ -890,11 +867,10 @@ class draggable_radial:
             self.snapAngle(x)
 
     def snapAngle(self, x):
-        """
-        snap the mouse position to the cente of a beam, update the beam
-        line and beam number text.
-        """
+        """Snap the mouse position to the cente of a beam.
 
+        Updates the beam line and beam number text.
+        """
         idx = (np.abs(self.theta - x)).argmin()
         snappedAngle = self.theta[idx]
         self.line.set_data([snappedAngle, snappedAngle], [0, self.maxRange])
@@ -906,7 +882,7 @@ class draggable_radial:
         self.c.draw_idle()
 
     def releaseonclick(self, _event):
-        """ Stop following events once mouse button is released  """
+        """Stop following events once mouse button is released."""
         self.value = self.line.get_xdata()[0]
 
         self.c.mpl_disconnect(self.releaser)
