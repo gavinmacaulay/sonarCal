@@ -33,6 +33,7 @@ Configuration of the program is done by editing the config file (called ``sonar_
 - The location of log files (``logDir``),
 - The NetCDF4 group name for the horizontal sonar beams (``horizontalBeamGroupPath``),
 - Whether to expect live data or whether to replay all the pings in the last file in ``watchDir`` (``liveData`` - set to ``yes`` or ``no``),
+- The speed to display replayed data. Use ``realtime`` to replay at the same speed as the data were collected. Any other value will replay as fast as possible
 - The number of pings shown in the echograms (``numPingsToShow``),
 - The maximum range of the echograms (``maxRange`` [m]), and
 - The mininium and maximum Sv values used in the colormap (``minSv`` and ``maxSv`` [dB]).

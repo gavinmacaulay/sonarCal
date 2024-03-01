@@ -67,6 +67,7 @@ def main():
                              'maxRange': 50,
                              'maxSv': -20,
                              'minSv': -60,
+                             'replayRate': 'realtime',
                              'horizontalBeamGroupPath': 'Sonar/Beam_group1',
                              'watchDir': 'directory where the .nc files are',
                              'liveData': 'yes',
@@ -84,6 +85,7 @@ def main():
     maxRange = config.getfloat('DEFAULT', 'maxRange')
     maxSv = config.getfloat('DEFAULT', 'maxSv')
     minSv = config.getfloat('DEFAULT', 'minSv')
+    replayRate = config.get('DEFAULT', 'replayRate')
     horizontalBeamGroup = config.get('DEFAULT', 'horizontalBeamGroupPath')
     watchDir = Path(config.get('DEFAULT', 'watchDir'))
     liveData = config.getboolean('DEFAULT', 'liveData')
@@ -110,7 +112,7 @@ def main():
     if liveData:
         t = threading.Thread(target=file_listen, args=(watchDir, horizontalBeamGroup))
     else:
-        t = threading.Thread(target=file_replay, args=(watchDir, horizontalBeamGroup))
+        t = threading.Thread(target=file_replay, args=(watchDir, horizontalBeamGroup, replayRate))
 
     t.daemon = True  # makes the thread close when main() ends
     t.start()
@@ -224,7 +226,7 @@ def file_listen(watchDir, beamGroup):
                     sleep(errorWaitInterval)
 
 
-def file_replay(watchDir, beamGroup):
+def file_replay(watchDir, beamGroup, replayRate):
     """Replay all data in the newest file. Used for testing."""
     waitIntervalFile = 1.0  # [s] time period between checking for new files
 
@@ -257,10 +259,12 @@ def file_replay(watchDir, beamGroup):
         # send the data off to be plotted
         queue.put((t[i], samInt, c, sv, theta, labels))
 
-        # try to ping at the realtime speed
-        if i > 0:
+        # Ping at recorded ping rate if asked
+        if replayRate == 'realtime' and i > 0:
             # t has units of nanoseconds
             sleep((t[i] - t[i-1])/1e9)
+        else:
+            sleep(0.2)
 
     f.close()
 
