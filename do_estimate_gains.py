@@ -64,12 +64,16 @@ def main():
             # and the new gain correction is....
             gainNew = gainOld + ts_mean - sphereTS
 
+            # This is quite specific to the actual sonar equations - is ok for Simrad and Furuno
+            # omnisonars as of 2024...
+            ts_mean = ts_mean + gainOld - gainNew
+
             calLog.iloc[i, calLog.columns.get_loc('ts_mean')] = ts_mean
             calLog.iloc[i, calLog.columns.get_loc('ts_rms')] = ts_rms
             calLog.iloc[i, calLog.columns.get_loc('ts_range')] = ts_range
             calLog.iloc[i, calLog.columns.get_loc('ts_num')] = ts_num
-            calLog.iloc[i, calLog.columns.get_loc('gain_old')] = gainNew
-            calLog.iloc[i, calLog.columns.get_loc('gain_new')] = gainOld
+            calLog.iloc[i, calLog.columns.get_loc('gain_old')] = gainOld
+            calLog.iloc[i, calLog.columns.get_loc('gain_new')] = gainNew
 
             logging.info('  Beam %s has TS = %.1f with RMS of %.2f dB at %.1f m',
                          row["beam_name"], ts_mean, ts_rms, ts_range)
