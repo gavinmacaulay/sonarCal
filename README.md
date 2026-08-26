@@ -1,3 +1,6 @@
+> [!NOTE]
+>  The code in this repository is not actively maintained. See [sonarCal](https://github.com/Aqualyd-Limited/sonarCal) for an improved and maintained omni-sonar calibration program.
+
 This repository contains several programs to assist with the calibration of ship-mounted fisheries omni-sonar systems that produce data in the SONAR-netCDF4 format. The programs are:
 - [do_sonar_calibration.py](#sonarCal) - assists with real-time calibration
 - [do_estimate_gains.py](#estimate-gains) - estimates gains from existing calibration data
